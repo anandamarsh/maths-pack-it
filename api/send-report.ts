@@ -1,0 +1,192 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "10mb",
+    },
+  },
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function applyHtmlReplacements(
+  template: string,
+  replacements: Array<{ plain: string; html: string }>,
+): string {
+  let formatted = escapeHtml(template);
+
+  for (const { plain, html } of replacements.sort((a, b) => b.plain.length - a.plain.length)) {
+    if (!plain) continue;
+    formatted = formatted.split(escapeHtml(plain)).join(html);
+  }
+
+  return formatted;
+}
+
+function normalizeBody(body: unknown) {
+  if (typeof body === "string") {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return null;
+    }
+  }
+  return body && typeof body === "object" ? body : null;
+}
+
+export default async function handler(req: any, res: any) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({ error: "Method not allowed." });
+    return;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+
+  if (!apiKey || !from) {
+    res.status(500).json({ error: "Email service is not configured." });
+    return;
+  }
+
+  const payload = normalizeBody(req.body) as
+    | {
+        email?: string;
+        pdfBase64?: string;
+        playerName?: string;
+        correctCount?: number;
+        totalQuestions?: number;
+        accuracy?: number;
+        senderName?: string;
+        gameName?: string;
+        siteUrl?: string;
+        sessionTime?: string;
+        sessionDate?: string;
+        durationText?: string;
+        stageLabel?: string;
+        curriculumCode?: string;
+        curriculumDescription?: string;
+        curriculumUrl?: string;
+        curriculumIndexUrl?: string;
+        reportFileName?: string;
+        // i18n: pre-translated email strings from the frontend
+        emailSubject?: string;
+        emailGreeting?: string;
+        emailBody?: string;
+        emailCurriculum?: string;
+        emailRegards?: string;
+      }
+    | null;
+
+  const email = payload?.email?.trim() ?? "";
+  const pdfBase64 = payload?.pdfBase64?.trim() ?? "";
+
+  if (!EMAIL_RE.test(email)) {
+    res.status(400).json({ error: "Enter a valid email address." });
+    return;
+  }
+
+  if (!pdfBase64) {
+    res.status(400).json({ error: "Report attachment is missing." });
+    return;
+  }
+
+  const reportFileName = payload?.reportFileName || "ripple-report.pdf";
+  const senderName = payload?.senderName || "Ripple Touch";
+  const gameName = payload?.gameName || "Ripple Touch";
+  const siteUrl = payload?.siteUrl || "https://www.seemaths.com";
+  const sessionTime = payload?.sessionTime || "Unknown time";
+  const sessionDate = payload?.sessionDate || "Unknown date";
+  const durationText = payload?.durationText || "an unknown duration";
+  const stageLabel = payload?.stageLabel || "NSW Curriculum";
+  const curriculumCode = payload?.curriculumCode || "N/A";
+  const curriculumDescription =
+    payload?.curriculumDescription || "No curriculum description supplied.";
+  const curriculumUrl = payload?.curriculumUrl || "https://www.seemaths.com";
+  const curriculumIndexUrl =
+    payload?.curriculumIndexUrl ||
+    "https://www.educationstandards.nsw.edu.au/wps/portal/nesa/k-10/learning-areas/mathematics/mathematics-k-10";
+
+  const scoreLine = `${payload?.correctCount ?? 0}/${payload?.totalQuestions ?? 0}`;
+  const accuracy = `${payload?.accuracy ?? 0}%`;
+
+  // Use pre-translated strings if available, otherwise fall back to English defaults
+  const subject = payload?.emailSubject || `${gameName} Report`;
+  const greeting = payload?.emailGreeting || "Hi there,";
+  const bodyIntro = payload?.emailBody ||
+    `A player played <strong>${escapeHtml(gameName)}</strong> at <a href="${escapeHtml(siteUrl)}">SeeMaths</a> at <strong>${escapeHtml(sessionTime)}</strong> on <strong>${escapeHtml(sessionDate)}</strong> for <strong>${escapeHtml(durationText)}</strong>. They scored <strong>${escapeHtml(scoreLine)}</strong> and had an accuracy of <strong>${escapeHtml(accuracy)}</strong>.`;
+  const curriculumParagraph = payload?.emailCurriculum ||
+    `This game is equivalent to <a href="${escapeHtml(curriculumIndexUrl)}"><strong>${escapeHtml(stageLabel)}</strong></a> on topic <a href="${escapeHtml(curriculumUrl)}"><strong>${escapeHtml(curriculumCode)} - ${escapeHtml(curriculumDescription)}</strong></a>.`;
+  const regards = payload?.emailRegards || "Regards,";
+
+  const hasTranslatedStrings = !!payload?.emailBody;
+  const formattedBody = hasTranslatedStrings
+    ? `<p>${applyHtmlReplacements(bodyIntro, [
+        { plain: gameName, html: `<strong>${escapeHtml(gameName)}</strong>` },
+        { plain: "SeeMaths", html: `<a href="${escapeHtml(siteUrl)}">SeeMaths</a>` },
+        { plain: sessionTime, html: `<strong>${escapeHtml(sessionTime)}</strong>` },
+        { plain: sessionDate, html: `<strong>${escapeHtml(sessionDate)}</strong>` },
+        { plain: durationText, html: `<strong>${escapeHtml(durationText)}</strong>` },
+        { plain: scoreLine, html: `<strong>${escapeHtml(scoreLine)}</strong>` },
+        { plain: accuracy, html: `<strong>${escapeHtml(accuracy)}</strong>` },
+      ])}</p>`
+    : `<p>${bodyIntro}</p>`;
+  const formattedCurriculum = hasTranslatedStrings
+    ? `<p>${applyHtmlReplacements(curriculumParagraph, [
+        {
+          plain: `${curriculumCode} - ${curriculumDescription}`,
+          html: `<a href="${escapeHtml(curriculumUrl)}"><strong>${escapeHtml(curriculumCode)} - ${escapeHtml(curriculumDescription)}</strong></a>`,
+        },
+        {
+          plain: stageLabel,
+          html: `<a href="${escapeHtml(curriculumIndexUrl)}"><strong>${escapeHtml(stageLabel)}</strong></a>`,
+        },
+      ])}</p>`
+    : `<p>${curriculumParagraph}</p>`;
+
+  const resendResponse = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${senderName} <${from}>`,
+      to: [email],
+      subject,
+      html: `
+        <p>${escapeHtml(greeting)}</p>
+        ${formattedBody}
+        ${formattedCurriculum}
+        <p>
+          ${escapeHtml(regards)}<br />
+          ${escapeHtml(gameName)}<br />
+          <a href="${escapeHtml(siteUrl)}">SeeMaths</a>
+        </p>
+      `,
+      attachments: [
+        {
+          filename: reportFileName,
+          content: pdfBase64,
+        },
+      ],
+    }),
+  });
+
+  if (!resendResponse.ok) {
+    const errorText = await resendResponse.text();
+    console.error("Resend send failed:", errorText);
+    res.status(502).json({ error: "Report email could not be sent." });
+    return;
+  }
+
+  res.status(200).json({ ok: true });
+}

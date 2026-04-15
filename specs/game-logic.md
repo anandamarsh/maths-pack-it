@@ -30,8 +30,8 @@ type PackQuestion = {
   groupsB?: number;      // new groups (given or to find)
   answer: number;        // the correct answer
   answerUnit: string;    // e.g. 'apples' or 'crates'
-  questionText: string;  // IXL-style word problem string
-  blackboardSteps: string[]; // lines to display on blackboard, built progressively
+  questionText: string;  // bottom-dock question string
+  blackboardSteps: string[]; // lines to display in the bottom steps panel, built progressively
   isFraction: boolean;
 };
 
@@ -81,7 +81,7 @@ function makeL1Question(round: 'load'|'pack'|'ship', usedPairs: GroupingPair[]):
     totalA: total, groupsA: groups, unitRate: unit,
     answer: unit,
     answerUnit: `${pair.itemPlural} per ${pair.container}`,
-    questionText: `Pack ${total} ${pair.itemPlural} equally into ${groups} ${pair.containerPlural}.`,
+      questionText: `There are ${total} ${pair.itemPlural} that have to be packed equally into ${groups} ${pair.containerPlural}. How many shall each ${pair.container} have?`,
     blackboardSteps: [
       `${groups} ${pair.containerPlural} → ${total} ${pair.itemPlural}`,
       `1 ${pair.container} → ${unit} ${pair.itemPlural}`,
