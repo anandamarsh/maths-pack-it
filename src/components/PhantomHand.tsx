@@ -15,6 +15,8 @@ const AUTOPILOT_HAND_GLOW = "rgba(56,216,255,0.82)";
 export default function PhantomHand({ pos }: Props) {
   if (!pos) return null;
 
+  const transitionMs = pos.durationMs ?? 460;
+
   return (
     <div
       aria-hidden="true"
@@ -23,7 +25,7 @@ export default function PhantomHand({ pos }: Props) {
         left: pos.x,
         top: pos.y,
         transform: "translate(-28px, -8px)",
-        transition: "left 140ms ease-out, top 140ms ease-out",
+        transition: `left ${transitionMs}ms ease-in-out, top ${transitionMs}ms ease-in-out`,
         filter: `drop-shadow(0 0 10px ${AUTOPILOT_HAND_GLOW})`,
       }}
     >

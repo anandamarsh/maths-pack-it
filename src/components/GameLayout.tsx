@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import { useIsCoarsePointer, useIsMobileLandscape } from "../hooks/useMediaQuery";
@@ -47,6 +48,18 @@ interface GameLayoutProps {
   canSubmit?: boolean;
   demoBanner?: ReactNode;
   calculatorTopBanner?: ReactNode;
+  chromeTheme?: {
+    questionBoxStyle?: CSSProperties;
+    calculatorBannerStyle?: CSSProperties;
+    keypadTheme?: {
+      panelBackground?: string;
+      panelBorder?: string;
+      panelGlow?: string;
+      displayBorder?: string;
+      displayColor?: string;
+      displayGlow?: string;
+    };
+  };
   hideKeypad?: boolean;
 
   // Question bar (optional)
@@ -85,6 +98,7 @@ interface GameLayoutProps {
 
   // Forces keypad to stay expanded (used by autopilot when typing)
   forceKeypadExpanded?: boolean;
+  sceneBackdrop?: ReactNode;
 
   // Game canvas
   children:
@@ -106,6 +120,7 @@ export default function GameLayout({
   canSubmit = false,
   demoBanner,
   calculatorTopBanner,
+  chromeTheme,
   hideKeypad = false,
   question,
   questionShake = false,
@@ -123,6 +138,7 @@ export default function GameLayout({
   isQuestionDemo = false,
   onQuestionDemo,
   forceKeypadExpanded = false,
+  sceneBackdrop,
   children,
   questionPanel,
 }: GameLayoutProps) {
@@ -200,7 +216,11 @@ export default function GameLayout({
     progress !== undefined && progressTotal !== undefined
       ? Array.from({ length: progressTotal }, (_, i) => i < progress)
       : null;
-  const dockHeight = effectiveCalcMinimized ? "4.5rem" : "15.25rem";
+  const dockHeight = effectiveCalcMinimized
+    ? "4.5rem"
+    : calculatorTopBanner
+      ? "17.9rem"
+      : "15.25rem";
   const dockTransition = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
   return (
@@ -208,6 +228,12 @@ export default function GameLayout({
       className="fixed inset-0 overflow-hidden flex flex-col arcade-grid"
       style={{ background: "#020617" }}
     >
+      {sceneBackdrop ? (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {sceneBackdrop}
+        </div>
+      ) : null}
+
       {/* ── Comments drawer ──────────────────────────────────────────────── */}
       {commentsOpen && (
         <div className="social-backdrop" onClick={() => setCommentsOpen(false)} />
@@ -465,11 +491,11 @@ export default function GameLayout({
       </div>
 
       {/* ── Rest: canvas (absolute) + floating bottom bar ───────────────── */}
-      <div className="relative flex-1 min-h-0 mx-2 mb-2">
+      <div className="relative z-[1] flex-1 min-h-0 mx-0 mb-0">
 
         {/* Canvas — always fills the full rest area */}
         <div
-          className="absolute left-0 right-0 top-0 rounded-xl overflow-hidden"
+          className="absolute left-0 right-0 top-0 overflow-hidden"
           style={{
             bottom: dockHeight,
             transition: `bottom ${dockTransition}`,
@@ -533,15 +559,19 @@ export default function GameLayout({
             </div>
           ) : question !== undefined ? (
             <div className="flex-1 min-w-0">
-              <QuestionBox shake={questionShake} onClick={toggleCalc}>
+              <QuestionBox
+                shake={questionShake}
+                onClick={toggleCalc}
+                style={chromeTheme?.questionBoxStyle}
+              >
                 {question}
               </QuestionBox>
             </div>
           ) : null}
-
+ 
           {/* Calculator */}
           {!hideKeypad && (
-            <div className="flex h-full min-h-0 flex-col self-start">
+            <div className="flex h-full min-h-0 flex-col justify-end self-stretch">
               {calculatorTopBanner ? (
               <div
                 className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"
@@ -551,6 +581,7 @@ export default function GameLayout({
                   borderWidth: "3px",
                   color: "#fde047",
                   marginBottom: "2px",
+                  ...chromeTheme?.calculatorBannerStyle,
                 }}
               >
                 {calculatorTopBanner}
@@ -564,6 +595,7 @@ export default function GameLayout({
                 canSubmit={canSubmit}
                 minimized={effectiveCalcMinimized}
                 onToggleMinimized={toggleCalc}
+                theme={chromeTheme?.keypadTheme}
               />
             </div>
           )}

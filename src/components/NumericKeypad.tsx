@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useIsCoarsePointer, useIsMobileLandscape } from "../hooks/useMediaQuery";
 import { playKeyClick } from "../sound";
 
@@ -14,6 +15,20 @@ interface NumericKeypadProps {
   /** Controlled from outside (GameLayout lifts this state) */
   minimized: boolean;
   onToggleMinimized: () => void;
+  theme?: {
+    panelBackground?: string;
+    panelBorder?: string;
+    panelGlow?: string;
+    digitBackground?: string;
+    digitBorder?: string;
+    digitColor?: string;
+    operatorBackground?: string;
+    operatorBorder?: string;
+    operatorColor?: string;
+    displayBorder?: string;
+    displayColor?: string;
+    displayGlow?: string;
+  };
 }
 
 export default function NumericKeypad({
@@ -24,6 +39,7 @@ export default function NumericKeypad({
   canSubmit = false,
   minimized,
   onToggleMinimized,
+  theme,
 }: NumericKeypadProps) {
   const isCoarsePointer = useIsCoarsePointer();
   const isMobileLandscape = useIsMobileLandscape();
@@ -60,13 +76,47 @@ export default function NumericKeypad({
   const rows = [["7", "8", "9", "⌫"], ["4", "5", "6", "±"], ["1", "2", "3", "."]];
   const buttonHeightClass = isMobileLandscape ? "h-[56px]" : isCoarsePointer ? "h-[45px]" : "h-[55px] md:h-10";
   const base = `rounded flex items-center justify-center font-black select-none transition-transform active:scale-95 ${isMobileLandscape ? "text-[1.6875rem]" : "text-[1.5rem] md:text-[1.3125rem]"} ${buttonHeightClass}`;
-  const digit = `${base} ${isMobileLandscape ? "text-[1.875rem]" : "text-[1.7rem] md:text-[1.5rem]"} bg-slate-800 text-slate-100 border border-slate-600/60`;
-  const op = `${base} bg-slate-700/80 text-slate-100 border border-slate-500/60`;
+  const digit = `${base} ${isMobileLandscape ? "text-[1.875rem]" : "text-[1.7rem] md:text-[1.5rem]"} border`;
+  const op = `${base} border`;
   const pressedKeyStyle: React.CSSProperties = {
     background: "#67e8f9", color: "#020617", borderColor: "#67e8f9",
     boxShadow: "0 0 16px rgba(103,232,249,0.45)",
   };
   const width = isMobileLandscape ? "w-[16.25rem]" : "w-[12.5rem] md:w-[13.75rem]";
+  const keypadPanelStyle: CSSProperties = {
+    background: theme?.panelBackground ?? "rgba(2,6,23,0.97)",
+    border: `4px solid ${theme?.panelBorder ?? "rgba(56,189,248,0.45)"}`,
+    boxShadow:
+      theme?.panelGlow ??
+      "0 0 18px rgba(56,189,248,0.12), inset 0 0 12px rgba(0,0,0,0.4)",
+  };
+  const keypadDisplayStyle: CSSProperties = {
+    fontFamily: "'DSEG7Classic', 'Courier New', monospace",
+    fontWeight: 700,
+    fontSize: DISPLAY_FONT_SIZE,
+    lineHeight: 1,
+    background: "rgba(0,8,4,0.95)",
+    border: minimized ? "none" : `2px solid ${theme?.displayBorder ?? "rgba(56,189,248,0.28)"}`,
+    color: theme?.displayColor ?? "#67e8f9",
+    textShadow:
+      theme?.displayGlow ??
+      "0 0 12px rgba(103,232,249,0.85), 0 0 26px rgba(56,189,248,0.4)",
+    letterSpacing: "0.08em",
+  };
+  const digitKeyStyle: CSSProperties = {
+    background: theme?.digitBackground ?? "rgba(30,41,59,0.96)",
+    borderColor: theme?.digitBorder ?? theme?.panelBorder ?? "rgba(71,85,105,0.6)",
+    color: theme?.digitColor ?? "#f8fafc",
+  };
+  const operatorKeyStyle: CSSProperties = {
+    background: theme?.operatorBackground ?? theme?.digitBackground ?? "rgba(51,65,85,0.92)",
+    borderColor:
+      theme?.operatorBorder ??
+      theme?.digitBorder ??
+      theme?.panelBorder ??
+      "rgba(100,116,139,0.6)",
+    color: theme?.operatorColor ?? theme?.digitColor ?? "#f8fafc",
+  };
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -117,28 +167,13 @@ export default function NumericKeypad({
   return (
     <div
       className={`relative flex min-h-0 min-w-0 ${width} shrink-0 flex-col rounded-xl p-1.5 gap-1`}
-      style={{
-        background: "rgba(2,6,23,0.97)",
-        border: "4px solid rgba(56,189,248,0.45)",
-        boxShadow: "0 0 18px rgba(56,189,248,0.12), inset 0 0 12px rgba(0,0,0,0.4)",
-      }}
+      style={keypadPanelStyle}
     >
       {/* Digital display — click toggles minimized */}
       <div
         className="relative rounded-lg px-3.5 flex shrink-0 items-center justify-end overflow-visible h-14 md:h-12 cursor-pointer"
         onClick={onToggleMinimized}
-        style={{
-          fontFamily: "'DSEG7Classic', 'Courier New', monospace",
-          fontWeight: 700,
-          fontSize: DISPLAY_FONT_SIZE,
-          lineHeight: 1,
-          background: "rgba(0,8,4,0.95)",
-          /* Inner border only when expanded — minimized shows only the outer thick border */
-          border: minimized ? "none" : "2px solid rgba(56,189,248,0.28)",
-          color: "#67e8f9",
-          textShadow: "0 0 12px rgba(103,232,249,0.85), 0 0 26px rgba(56,189,248,0.4)",
-          letterSpacing: "0.08em",
-        }}
+        style={keypadDisplayStyle}
       >
         {display}
       </div>
@@ -161,7 +196,13 @@ export default function NumericKeypad({
                 key={btn} type="button" onClick={() => press(btn)}
                 data-autopilot-key={btn}
                 className={/[0-9]/.test(btn) ? digit : op}
-                style={activeKey === btn ? pressedKeyStyle : undefined}
+                style={
+                  activeKey === btn
+                    ? pressedKeyStyle
+                    : /[0-9]/.test(btn)
+                      ? digitKeyStyle
+                      : operatorKeyStyle
+                }
               >
                 {btn === "±" ? <span className={`${isMobileLandscape ? "text-[2.25rem]" : "text-[2.4rem] md:text-[2.1rem]"} leading-none`}>±</span>
                   : btn === "⌫" ? <span className={`${isMobileLandscape ? "text-[2.475rem]" : "text-[2.8rem] md:text-[2.4rem]"} leading-none`}>⌫</span>
@@ -172,7 +213,15 @@ export default function NumericKeypad({
           </div>
         ))}
         <div className="flex gap-0.5 mt-0.5">
-          <button type="button" onClick={() => press("0")} data-autopilot-key="0" className={`${digit} flex-[2]`} style={activeKey === "0" ? pressedKeyStyle : undefined}>0</button>
+          <button
+            type="button"
+            onClick={() => press("0")}
+            data-autopilot-key="0"
+            className={`${digit} flex-[2]`}
+            style={activeKey === "0" ? pressedKeyStyle : digitKeyStyle}
+          >
+            0
+          </button>
           <button type="button" onClick={onSubmit} disabled={!canSubmit}
             data-autopilot-key="submit"
             className={`${base} flex-[2] arcade-button disabled:opacity-40 disabled:cursor-not-allowed`}>

@@ -55,6 +55,7 @@ export interface PhantomPos {
   x: number;
   y: number;
   isClicking: boolean;
+  durationMs?: number;
 }
 
 interface AutopilotGameState {
