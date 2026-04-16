@@ -55,8 +55,10 @@ type FlashFeedback = {
 } | null;
 
 type RevealCtaMode = "next" | "retry" | null;
+const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
 const QUESTION_COUNT = 10;
+const AUTOPILOT_QUESTION_COUNT = 5;
 const QUESTION_KEYWORDS = new Set([
   "pack",
   "packed",
@@ -198,6 +200,217 @@ function DigitalCount({
   );
 }
 
+let captureColorProbe: HTMLDivElement | null = null;
+
+function getCaptureColorProbe() {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  if (captureColorProbe) {
+    return captureColorProbe;
+  }
+
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.left = "-30000px";
+  probe.style.top = "0";
+  probe.style.opacity = "0";
+  probe.style.pointerEvents = "none";
+  probe.style.color = "#000";
+  document.body.appendChild(probe);
+  captureColorProbe = probe;
+  return captureColorProbe;
+}
+
+function normalizeCaptureColor(value: string) {
+  if (!value || !value.includes("oklch(")) {
+    return value;
+  }
+
+  const probe = getCaptureColorProbe();
+  if (!probe) {
+    return null;
+  }
+
+  try {
+    probe.style.color = "rgb(0, 0, 1)";
+    probe.style.color = value;
+    const normalized = window.getComputedStyle(probe).color;
+    return normalized.includes("oklch(") ? null : normalized;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeCaptureValue(property: string, value: string) {
+  if (!value || !value.includes("oklch(")) {
+    return value;
+  }
+
+  if (
+    property.includes("shadow") ||
+    property === "filter" ||
+    property === "backdrop-filter" ||
+    property === "background-image" ||
+    property === "mask-image" ||
+    property === "border-image-source"
+  ) {
+    return "none";
+  }
+
+  if (property === "background" || property === "background-color") {
+    const normalized = normalizeCaptureColor(value);
+    return normalized ?? "transparent";
+  }
+
+  if (
+    property.includes("color") ||
+    property === "fill" ||
+    property === "stroke"
+  ) {
+    return normalizeCaptureColor(value) ?? "transparent";
+  }
+
+  if (property.startsWith("border")) {
+    const normalized = normalizeCaptureColor(value);
+    return normalized ?? value.replace(/oklch\([^)]*\)/g, "transparent");
+  }
+
+  return value.replace(/oklch\([^)]*\)/g, "transparent");
+}
+
+function sourceBackgroundFromRoot(root: HTMLElement) {
+  const rawBackground =
+    window.getComputedStyle(root).backgroundColor || "#020617";
+  if (!rawBackground.includes("oklch(")) {
+    return rawBackground;
+  }
+  return normalizeCaptureColor(rawBackground) ?? "#020617";
+}
+
+function buildCaptureIframe(sourceRoot: HTMLElement) {
+  const sourceRect = sourceRoot.getBoundingClientRect();
+  const sourceBackground = sourceBackgroundFromRoot(sourceRoot);
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-30000px";
+  iframe.style.top = "0";
+  iframe.style.width = `${Math.ceil(sourceRect.width)}px`;
+  iframe.style.height = `${Math.ceil(sourceRect.height)}px`;
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.style.border = "0";
+  iframe.style.zIndex = "-1";
+  document.body.appendChild(iframe);
+
+  const captureDocument = iframe.contentDocument;
+  const captureWindow = iframe.contentWindow;
+  if (!captureDocument || !captureWindow) {
+    iframe.remove();
+    throw new Error("Unable to create capture document");
+  }
+
+  captureDocument.open();
+  captureDocument.write(
+    '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>',
+  );
+  captureDocument.close();
+
+  const replicaRoot = sourceRoot.cloneNode(true) as HTMLElement;
+  const sourceElements = [
+    sourceRoot,
+    ...Array.from(sourceRoot.querySelectorAll<HTMLElement>("*")),
+  ];
+  const replicaElements = [
+    replicaRoot,
+    ...Array.from(replicaRoot.querySelectorAll<HTMLElement>("*")),
+  ];
+  const pairCount = Math.min(sourceElements.length, replicaElements.length);
+
+  for (let index = 0; index < pairCount; index += 1) {
+    const sourceElement = sourceElements[index];
+    const replicaElement = replicaElements[index];
+    const computedStyle = window.getComputedStyle(sourceElement);
+
+    replicaElement.removeAttribute("class");
+    replicaElement.removeAttribute("id");
+    replicaElement.removeAttribute("data-pack-it-capture-root");
+
+    for (const attributeName of Array.from(
+      replicaElement.getAttributeNames(),
+    )) {
+      if (
+        attributeName === "src" ||
+        attributeName === "href" ||
+        attributeName === "alt"
+      ) {
+        continue;
+      }
+      if (attributeName.startsWith("aria-")) {
+        continue;
+      }
+      replicaElement.removeAttribute(attributeName);
+    }
+
+    for (const property of computedStyle) {
+      const value = computedStyle.getPropertyValue(property);
+      if (!value) {
+        continue;
+      }
+
+      const sanitizedValue = value.includes("oklch(")
+        ? sanitizeCaptureValue(property, value)
+        : value;
+      if (!sanitizedValue || sanitizedValue.includes("oklch(")) {
+        continue;
+      }
+
+      replicaElement.style.setProperty(property, sanitizedValue);
+    }
+
+    replicaElement.style.setProperty("transition", "none");
+    replicaElement.style.setProperty("animation", "none");
+    replicaElement.style.setProperty("caret-color", "transparent");
+    replicaElement.style.setProperty("color-scheme", "light");
+  }
+
+  captureDocument.documentElement.style.margin = "0";
+  captureDocument.documentElement.style.padding = "0";
+  captureDocument.documentElement.style.width = `${Math.ceil(sourceRect.width)}px`;
+  captureDocument.documentElement.style.height = `${Math.ceil(sourceRect.height)}px`;
+  captureDocument.body.style.margin = "0";
+  captureDocument.body.style.padding = "0";
+  captureDocument.body.style.width = `${Math.ceil(sourceRect.width)}px`;
+  captureDocument.body.style.height = `${Math.ceil(sourceRect.height)}px`;
+  captureDocument.body.style.background = sourceBackground;
+  captureDocument.body.style.overflow = "hidden";
+
+  replicaRoot.style.position = "relative";
+  replicaRoot.style.left = "0";
+  replicaRoot.style.top = "0";
+  replicaRoot.style.width = `${Math.ceil(sourceRect.width)}px`;
+  replicaRoot.style.height = `${Math.ceil(sourceRect.height)}px`;
+  replicaRoot.style.minWidth = `${Math.ceil(sourceRect.width)}px`;
+  replicaRoot.style.minHeight = `${Math.ceil(sourceRect.height)}px`;
+  replicaRoot.style.pointerEvents = "none";
+  replicaRoot.style.margin = "0";
+  replicaRoot.style.isolation = "isolate";
+  replicaRoot.style.background = sourceBackground;
+
+  replicaRoot
+    .querySelectorAll<HTMLButtonElement>(
+      'button[aria-label^="Remove "] > span:last-child',
+    )
+    .forEach((node) => {
+      node.style.transform = "translateY(-20px)";
+    });
+
+  captureDocument.body.appendChild(replicaRoot);
+  return { iframe, root: replicaRoot };
+}
+
 export default function PackItScreen() {
   const round = useMemo(() => makeRound(1, "load"), []);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -214,14 +427,19 @@ export default function PackItScreen() {
   const [isRoundComplete, setIsRoundComplete] = useState(false);
   const [questionSolved, setQuestionSolved] = useState(false);
   const [flash, setFlash] = useState<FlashFeedback>(null);
-  const [mistakeQuestionIndexes, setMistakeQuestionIndexes] = useState<number[]>(
-    [],
-  );
+  const [mistakeQuestionIndexes, setMistakeQuestionIndexes] = useState<
+    number[]
+  >([]);
   const [typedQuestionLength, setTypedQuestionLength] = useState(0);
   const [typedStepLengths, setTypedStepLengths] = useState<number[]>([]);
   const [showNextQuestionButton, setShowNextQuestionButton] = useState(false);
   const [revealCtaMode, setRevealCtaMode] = useState<RevealCtaMode>(null);
   const [questionResetKey, setQuestionResetKey] = useState(0);
+  const [displayTopBoxCount, setDisplayTopBoxCount] = useState(0);
+  const [calculatorInput, setCalculatorInput] = useState("0");
+  const [calculatorOverride, setCalculatorOverride] = useState(false);
+  const [isCalculatorAdjusting, setIsCalculatorAdjusting] = useState(false);
+  const [isContinuousAutopilot, setIsContinuousAutopilot] = useState(false);
   const [snipMode, setSnipMode] = useState(false);
   const [snipSelection, setSnipSelection] = useState<SquareSnip>({
     x: 24,
@@ -247,11 +465,19 @@ export default function PackItScreen() {
   const questionTypeIntervalRef = useRef<number | null>(null);
   const stepTypeIntervalRef = useRef<number | null>(null);
   const stepTypeDelayRef = useRef<number | null>(null);
+  const displaySyncLockRef = useRef<number | null>(null);
+  const keypadDebounceRef = useRef<number | null>(null);
+  const keypadAdjustTimersRef = useRef<number[]>([]);
+  const autopilotAdvanceTimerRef = useRef<number | null>(null);
+  const continuousAutopilotStartTimerRef = useRef<number | null>(null);
+  const cheatBufferRef = useRef("");
+  const continuousAutopilotStartIndexRef = useRef(0);
   const dragSoundPointRef = useRef<{
     x: number;
     y: number;
     carry: number;
   } | null>(null);
+  const itemsRef = useRef<PackedItem[]>(items);
 
   const question = round.questions[questionIndex];
   const containers = Array.from({ length: question.groupsA }, (_, index) =>
@@ -259,12 +485,27 @@ export default function PackItScreen() {
   );
   const remainingItems = items.filter((item) => item.containerIndex === null);
   const packedItemsTotal = items.length - remainingItems.length;
-  const canSubmit = packedItemsTotal > 0 && revealCtaMode === null && !isQuestionDemo;
+  const canSubmit =
+    packedItemsTotal > 0 && revealCtaMode === null && !isQuestionDemo;
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const returningItemIds = new Set(returnStates.map((state) => state.itemId));
   const draggedItemIds = new Set(dragState?.itemIds ?? []);
   const selectedItemIdSet = new Set(selectedItemIds);
-  const comboSize = Math.min(3, question.groupsA);
+  const comboSize = question.groupsA;
+  const autopilotProgress = isContinuousAutopilot
+    ? Math.min(
+        AUTOPILOT_QUESTION_COUNT,
+        Math.max(0, questionIndex - continuousAutopilotStartIndexRef.current) +
+          (questionSolved ? 1 : 0),
+      )
+    : questionIndex + (questionSolved ? 1 : 0);
+  const progressTotal = isContinuousAutopilot
+    ? AUTOPILOT_QUESTION_COUNT
+    : QUESTION_COUNT;
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     if (stepTypeIntervalRef.current !== null) {
@@ -308,7 +549,7 @@ export default function PackItScreen() {
           if (lineIndex >= steps.length - 1) {
             stepTypeDelayRef.current = window.setTimeout(() => {
               setShowNextQuestionButton(true);
-            }, 3000);
+            }, 1000);
             return;
           }
           lineIndex += 1;
@@ -331,6 +572,19 @@ export default function PackItScreen() {
       }
     };
   }, [question.blackboardSteps, questionResetKey, showUnitReveal]);
+
+  useEffect(() => {
+    if (displaySyncLockRef.current !== null) {
+      return;
+    }
+    setDisplayTopBoxCount(containers[0]?.length ?? 0);
+  }, [containers]);
+
+  useEffect(() => {
+    if (!calculatorOverride) {
+      setCalculatorInput(String(displayTopBoxCount));
+    }
+  }, [calculatorOverride, displayTopBoxCount]);
 
   useEffect(() => {
     return () => {
@@ -357,6 +611,22 @@ export default function PackItScreen() {
       if (stepTypeDelayRef.current !== null) {
         window.clearTimeout(stepTypeDelayRef.current);
       }
+      if (displaySyncLockRef.current !== null) {
+        window.clearTimeout(displaySyncLockRef.current);
+      }
+      if (keypadDebounceRef.current !== null) {
+        window.clearTimeout(keypadDebounceRef.current);
+      }
+      if (autopilotAdvanceTimerRef.current !== null) {
+        window.clearTimeout(autopilotAdvanceTimerRef.current);
+      }
+      if (continuousAutopilotStartTimerRef.current !== null) {
+        window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      }
+      keypadAdjustTimersRef.current.forEach((timer) =>
+        window.clearTimeout(timer),
+      );
+      keypadAdjustTimersRef.current = [];
     };
   }, []);
 
@@ -380,7 +650,10 @@ export default function PackItScreen() {
       if (fullText[nextLength - 1]?.trim()) {
         playTypewriterTick();
       }
-      if (nextLength >= fullText.length && questionTypeIntervalRef.current !== null) {
+      if (
+        nextLength >= fullText.length &&
+        questionTypeIntervalRef.current !== null
+      ) {
         window.clearInterval(questionTypeIntervalRef.current);
         questionTypeIntervalRef.current = null;
       }
@@ -467,9 +740,36 @@ export default function PackItScreen() {
     setRevealCtaMode(null);
     setHoveredSourceArea(false);
     setSelectedItemIds([]);
+    setDisplayTopBoxCount(0);
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+    setIsCalculatorAdjusting(false);
+    setIsContinuousAutopilot(false);
     setQuestionResetKey((current) => current + 1);
     dragSoundPointRef.current = null;
     nextComboIdRef.current = 1;
+    if (displaySyncLockRef.current !== null) {
+      window.clearTimeout(displaySyncLockRef.current);
+      displaySyncLockRef.current = null;
+    }
+    if (keypadDebounceRef.current !== null) {
+      window.clearTimeout(keypadDebounceRef.current);
+      keypadDebounceRef.current = null;
+    }
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+      autopilotAdvanceTimerRef.current = null;
+    }
+    if (continuousAutopilotStartTimerRef.current !== null) {
+      window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      continuousAutopilotStartTimerRef.current = null;
+    }
+    keypadAdjustTimersRef.current.forEach((timer) =>
+      window.clearTimeout(timer),
+    );
+    keypadAdjustTimersRef.current = [];
+    cheatBufferRef.current = "";
+    continuousAutopilotStartIndexRef.current = 0;
   }
 
   function assignItems(
@@ -502,12 +802,319 @@ export default function PackItScreen() {
     dragSoundPointRef.current = null;
   }
 
+  function lockDisplayTopBoxCount(nextValue: number, delayMs: number) {
+    if (displaySyncLockRef.current !== null) {
+      window.clearTimeout(displaySyncLockRef.current);
+    }
+    displaySyncLockRef.current = window.setTimeout(() => {
+      setDisplayTopBoxCount(nextValue);
+      displaySyncLockRef.current = null;
+    }, delayMs);
+  }
+
+  function clearKeypadAdjustTimers() {
+    if (keypadDebounceRef.current !== null) {
+      window.clearTimeout(keypadDebounceRef.current);
+      keypadDebounceRef.current = null;
+    }
+    keypadAdjustTimersRef.current.forEach((timer) =>
+      window.clearTimeout(timer),
+    );
+    keypadAdjustTimersRef.current = [];
+  }
+
+  function scheduleAdjustTimer(callback: () => void, delayMs: number) {
+    const timer = window.setTimeout(() => {
+      keypadAdjustTimersRef.current = keypadAdjustTimersRef.current.filter(
+        (current) => current !== timer,
+      );
+      callback();
+    }, delayMs);
+    keypadAdjustTimersRef.current.push(timer);
+  }
+
+  function getCurrentItemsInContainer(containerIndex: number) {
+    return itemsRef.current
+      .filter((item) => item.containerIndex === containerIndex)
+      .sort((left, right) => left.id - right.id);
+  }
+
+  function animateItemsToSource(itemIds: number[]) {
+    const packedItems = itemsRef.current.filter(
+      (item) => itemIds.includes(item.id) && item.containerIndex !== null,
+    );
+    if (packedItems.length === 0) {
+      return;
+    }
+
+    const startStates = packedItems
+      .map((item) => {
+        const center = getScreenCenter(itemRefs.current[item.id]);
+        return center
+          ? {
+              itemId: item.id,
+              x: center.x - 32,
+              y: center.y - 32,
+              durationMs: 440,
+            }
+          : null;
+      })
+      .filter(
+        (
+          state,
+        ): state is {
+          itemId: number;
+          x: number;
+          y: number;
+          durationMs: number;
+        } => state !== null,
+      );
+
+    setReturnStates(startStates);
+    setItems((currentItems) =>
+      currentItems.map((currentItem) =>
+        itemIds.includes(currentItem.id)
+          ? { ...currentItem, containerIndex: null, comboId: null }
+          : currentItem,
+      ),
+    );
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const targetStates = packedItems
+          .map((item) => {
+            const center = getScreenCenter(itemRefs.current[item.id]);
+            return center
+              ? {
+                  itemId: item.id,
+                  x: center.x - 32,
+                  y: center.y - 32,
+                  durationMs: 440,
+                }
+              : null;
+          })
+          .filter(
+            (
+              state,
+            ): state is {
+              itemId: number;
+              x: number;
+              y: number;
+              durationMs: number;
+            } => state !== null,
+          );
+        setReturnStates(targetStates);
+      });
+    });
+
+    if (returnTimerRef.current !== null) {
+      window.clearTimeout(returnTimerRef.current);
+    }
+    returnTimerRef.current = window.setTimeout(() => {
+      setReturnStates([]);
+    }, 480);
+  }
+
+  function animateItemsFromSourceToAssignments(
+    itemIds: number[],
+    targetContainerIndexes: number[],
+  ) {
+    const sourceItems = itemsRef.current.filter((item) =>
+      itemIds.includes(item.id),
+    );
+    if (sourceItems.length === 0) {
+      return;
+    }
+
+    const comboIds = itemIds.map(
+      (_, index) =>
+        nextComboIdRef.current + Math.floor(index / question.groupsA),
+    );
+    nextComboIdRef.current += Math.ceil(itemIds.length / question.groupsA);
+
+    const startStates = sourceItems
+      .map((item) => {
+        const center = getScreenCenter(itemRefs.current[item.id]);
+        return center
+          ? {
+              itemId: item.id,
+              x: center.x - 32,
+              y: center.y - 32,
+              durationMs: 480,
+            }
+          : null;
+      })
+      .filter(
+        (
+          state,
+        ): state is {
+          itemId: number;
+          x: number;
+          y: number;
+          durationMs: number;
+        } => state !== null,
+      );
+
+    setReturnStates(startStates);
+    setItems((currentItems) =>
+      currentItems.map((currentItem) => {
+        const itemIndex = itemIds.indexOf(currentItem.id);
+        return itemIndex >= 0
+          ? {
+              ...currentItem,
+              containerIndex: targetContainerIndexes[itemIndex] ?? 0,
+              comboId: comboIds[itemIndex] ?? null,
+            }
+          : currentItem;
+      }),
+    );
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const targetStates = sourceItems
+          .map((item) => {
+            const center = getScreenCenter(itemRefs.current[item.id]);
+            return center
+              ? {
+                  itemId: item.id,
+                  x: center.x - 32,
+                  y: center.y - 32,
+                  durationMs: 480,
+                }
+              : null;
+          })
+          .filter(
+            (
+              state,
+            ): state is {
+              itemId: number;
+              x: number;
+              y: number;
+              durationMs: number;
+            } => state !== null,
+          );
+        setReturnStates(targetStates);
+      });
+    });
+
+    if (returnTimerRef.current !== null) {
+      window.clearTimeout(returnTimerRef.current);
+    }
+    returnTimerRef.current = window.setTimeout(() => {
+      setReturnStates([]);
+    }, 520);
+  }
+
+  function applyCalculatorTarget(rawValue: string) {
+    const parsed = Number.parseInt(rawValue, 10);
+    const targetTopCount = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+    const currentTopCount = getCurrentItemsInContainer(0).length;
+    const sourceCount = itemsRef.current.filter(
+      (item) => item.containerIndex === null,
+    ).length;
+    const maxAdditionalSteps = Math.ceil(sourceCount / question.groupsA);
+
+    clearKeypadAdjustTimers();
+    if (displaySyncLockRef.current !== null) {
+      window.clearTimeout(displaySyncLockRef.current);
+      displaySyncLockRef.current = null;
+    }
+
+    if (targetTopCount === currentTopCount) {
+      setCalculatorOverride(false);
+      setIsCalculatorAdjusting(false);
+      return;
+    }
+
+    setIsCalculatorAdjusting(true);
+
+    if (targetTopCount > currentTopCount) {
+      const stepsToAdd = Math.min(
+        targetTopCount - currentTopCount,
+        maxAdditionalSteps,
+      );
+      if (stepsToAdd === 0) {
+        setIsCalculatorAdjusting(false);
+        return;
+      }
+      const itemCountToAdd = stepsToAdd * question.groupsA;
+      const sourceItems = itemsRef.current
+        .filter((item) => item.containerIndex === null)
+        .sort((left, right) => left.id - right.id)
+        .slice(0, itemCountToAdd);
+      const itemIds = sourceItems.map((item) => item.id);
+      const targetContainerIndexes = Array.from(
+        { length: itemIds.length },
+        (_, index) => index % question.groupsA,
+      );
+
+      lockDisplayTopBoxCount(currentTopCount + stepsToAdd, 520);
+      animateItemsFromSourceToAssignments(itemIds, targetContainerIndexes);
+      scheduleAdjustTimer(() => {
+        setIsCalculatorAdjusting(false);
+        if (targetTopCount <= currentTopCount + stepsToAdd) {
+          setCalculatorOverride(false);
+        }
+      }, 560);
+      return;
+    }
+
+    const stepsToRemove = currentTopCount - targetTopCount;
+    const removableIds = Array.from({ length: stepsToRemove }, (_, rowIndex) =>
+      Array.from({ length: question.groupsA }, (_, containerIndex) => {
+        const itemsInContainer = getCurrentItemsInContainer(containerIndex);
+        return (
+          itemsInContainer[itemsInContainer.length - 1 - rowIndex]?.id ?? null
+        );
+      }),
+    )
+      .flat()
+      .filter((itemId): itemId is number => itemId !== null);
+
+    lockDisplayTopBoxCount(targetTopCount, 440);
+    animateItemsToSource(removableIds);
+    scheduleAdjustTimer(() => {
+      setIsCalculatorAdjusting(false);
+      setCalculatorOverride(false);
+    }, 480);
+  }
+
+  function handleCalculatorChange(nextValue: string) {
+    const digitsOnly = nextValue.replace(/\D/g, "");
+    const normalizedValue =
+      digitsOnly === "" ? "0" : String(Number.parseInt(digitsOnly, 10));
+
+    setCalculatorInput(normalizedValue);
+    setCalculatorOverride(true);
+
+    clearKeypadAdjustTimers();
+    keypadDebounceRef.current = window.setTimeout(() => {
+      keypadDebounceRef.current = null;
+      applyCalculatorTarget(normalizedValue);
+    }, 360);
+  }
+
+  function handleCalculatorKeyInput(key: string) {
+    return key === "." || key === "±";
+  }
+
+  function revealAnswerForCurrentQuestion() {
+    markQuestionPenalty();
+    clearKeypadAdjustTimers();
+    setCalculatorInput(String(question.unitRate));
+    setCalculatorOverride(true);
+  }
+
   function stageComboIntoTopBox(
     itemIds: number[],
     targetContainerIndexes: number[],
     comboId: number,
     startPosition?: { x: number; y: number },
   ) {
+    const finalTopBoxCount = targetContainerIndexes.filter(
+      (containerIndex) => containerIndex === 0,
+    ).length;
+    lockDisplayTopBoxCount(finalTopBoxCount, 600);
     assignItems(itemIds, () => 0, comboId);
 
     const trailingItemIds = itemIds.slice(1);
@@ -517,8 +1124,10 @@ export default function PackItScreen() {
 
     window.setTimeout(() => {
       const fallbackCenter = getScreenCenter(containerRefs.current[0]);
-      const startX = startPosition?.x ?? (fallbackCenter ? fallbackCenter.x - 32 : 0);
-      const startY = startPosition?.y ?? (fallbackCenter ? fallbackCenter.y - 32 : 0);
+      const startX =
+        startPosition?.x ?? (fallbackCenter ? fallbackCenter.x - 32 : 0);
+      const startY =
+        startPosition?.y ?? (fallbackCenter ? fallbackCenter.y - 32 : 0);
 
       setReturnStates(
         trailingItemIds.map((itemId, trailingIndex) => ({
@@ -580,10 +1189,121 @@ export default function PackItScreen() {
     }, 120);
   }
 
+  function runQuestionAutopilot(mode: "retry" | "solve") {
+    if (questionSolved || isQuestionDemo || revealCtaMode === "retry") {
+      return;
+    }
+
+    setIsQuestionDemo(true);
+    setRevealCtaMode(null);
+    markQuestionPenalty();
+
+    const targetAssignments = buildRobotTargetAssignments(
+      itemsRef.current,
+      question.groupsA,
+      question.unitRate,
+    );
+    const pendingByContainer = Array.from(
+      { length: comboSize },
+      () => [] as number[],
+    );
+    itemsRef.current
+      .filter((item) => targetAssignments.get(item.id) !== item.containerIndex)
+      .forEach((item) => {
+        const containerIndex = targetAssignments.get(item.id);
+        if (
+          containerIndex !== undefined &&
+          containerIndex !== null &&
+          containerIndex < comboSize
+        ) {
+          pendingByContainer[containerIndex]!.push(item.id);
+        }
+      });
+
+    const comboAssignments = Array.from(
+      {
+        length: Math.max(
+          ...pendingByContainer.map((bucket) => bucket.length),
+          0,
+        ),
+      },
+      (_, rowIndex) =>
+        pendingByContainer
+          .map((bucket, containerIndex) => {
+            const itemId = bucket[rowIndex];
+            return itemId === undefined ? null : { itemId, containerIndex };
+          })
+          .filter(
+            (
+              entry,
+            ): entry is {
+              itemId: number;
+              containerIndex: number;
+            } => entry !== null,
+          ),
+    ).filter((group) => group.length > 0);
+
+    const DEMO_STEP_MS = 720;
+    const DEMO_DROP_DELAY_MS = 260;
+
+    comboAssignments.forEach((group, index) => {
+      window.setTimeout(() => {
+        const orderedGroup = group
+          .slice()
+          .sort((left, right) => left.containerIndex - right.containerIndex);
+        const leadItemCenter = getScreenCenter(
+          itemRefs.current[orderedGroup[0]!.itemId],
+        );
+        setSelectedItemIds(orderedGroup.map((entry) => entry.itemId));
+        const comboId = nextComboIdRef.current;
+        nextComboIdRef.current += 1;
+
+        if (leadItemCenter) {
+          setPhantomPos({ ...leadItemCenter, isClicking: false });
+        }
+
+        window.setTimeout(() => {
+          const targetCenter = getScreenCenter(containerRefs.current[0]);
+          if (targetCenter) {
+            setPhantomPos({ ...targetCenter, isClicking: true });
+          }
+          stageComboIntoTopBox(
+            orderedGroup.map((entry) => entry.itemId),
+            orderedGroup.map((entry) => entry.containerIndex),
+            comboId,
+            targetCenter
+              ? { x: targetCenter.x - 32, y: targetCenter.y - 32 }
+              : undefined,
+          );
+        }, DEMO_DROP_DELAY_MS);
+      }, index * DEMO_STEP_MS);
+    });
+
+    window.setTimeout(
+      () => {
+        setSelectedItemIds([]);
+        setShowUnitReveal(true);
+        setTypedStepLengths([]);
+        setShowNextQuestionButton(false);
+        setRevealCtaMode(mode === "retry" ? "retry" : "next");
+        setPhantomPos(null);
+        setIsQuestionDemo(false);
+        if (mode === "solve") {
+          setQuestionSolved(true);
+          setFlash({ ok: true, icon: true });
+          playCorrect();
+        }
+      },
+      comboAssignments.length * DEMO_STEP_MS + 700,
+    );
+  }
+
   function handleSubmitAnswer() {
     const isCorrect =
       remainingItems.length === 0 &&
-      containers.every((containerItems) => containerItems.length === question.unitRate);
+      containers.every(
+        (containerItems) => containerItems.length === question.unitRate,
+      );
 
     if (isCorrect) {
       setShowUnitReveal(true);
@@ -605,7 +1325,7 @@ export default function PackItScreen() {
     itemId: number,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
-    if (isQuestionDemo || revealCtaMode === "retry") {
+    if (isQuestionDemo || revealCtaMode === "retry" || isCalculatorAdjusting) {
       return;
     }
 
@@ -632,7 +1352,9 @@ export default function PackItScreen() {
       if (itemIds.length < comboSize) {
         const needed = comboSize - itemIds.length;
         itemIds = [
-          ...sourceItems.slice(Math.max(0, startIndex - needed), startIndex).map((item) => item.id),
+          ...sourceItems
+            .slice(Math.max(0, startIndex - needed), startIndex)
+            .map((item) => item.id),
           ...itemIds,
         ];
       }
@@ -778,17 +1500,17 @@ export default function PackItScreen() {
     }
 
     if (isOverSource) {
+      lockDisplayTopBoxCount(0, 220);
       assignItems(dragState.itemIds, () => null, null);
       return;
     }
 
-    const originStates = dragState.itemIds
-      .map((itemId, index) => ({
-        itemId,
-        originRect: itemRefs.current[itemId]?.getBoundingClientRect(),
-        x: dragState.x + index * 30,
-        y: dragState.y,
-      }));
+    const originStates = dragState.itemIds.map((itemId, index) => ({
+      itemId,
+      originRect: itemRefs.current[itemId]?.getBoundingClientRect(),
+      x: dragState.x + index * 30,
+      y: dragState.y,
+    }));
 
     setReturnStates(originStates.map(({ itemId, x, y }) => ({ itemId, x, y })));
     setDragState(null);
@@ -829,10 +1551,18 @@ export default function PackItScreen() {
       return;
     }
 
-    const canvas = await html2canvas(rootRef.current, {
-      backgroundColor: "#f8fafc",
-      scale: window.devicePixelRatio > 1 ? 2 : 1,
-    });
+    const captureFrame = buildCaptureIframe(rootRef.current);
+
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await html2canvas(captureFrame.root, {
+        backgroundColor: sourceBackgroundFromRoot(rootRef.current),
+        scale: window.devicePixelRatio > 1 ? 2 : 1,
+        useCORS: true,
+      });
+    } finally {
+      captureFrame.iframe.remove();
+    }
 
     let sourceCanvas = canvas;
     if (snipMode) {
@@ -865,7 +1595,9 @@ export default function PackItScreen() {
       anchor.download = snipMode
         ? "pack-it-snip.png"
         : "pack-it-screenshot.png";
+      document.body.appendChild(anchor);
       anchor.click();
+      anchor.remove();
       URL.revokeObjectURL(url);
     });
   }
@@ -983,98 +1715,7 @@ export default function PackItScreen() {
   }
 
   function solveCurrentQuestion() {
-    if (questionSolved || isQuestionDemo || revealCtaMode === "retry") {
-      return;
-    }
-
-    setIsQuestionDemo(true);
-    setRevealCtaMode(null);
-    markQuestionPenalty();
-
-    const targetAssignments = buildRobotTargetAssignments(
-      items,
-      question.groupsA,
-      question.unitRate,
-    );
-    const pendingByContainer = Array.from({ length: comboSize }, () => [] as number[]);
-    items
-      .filter((item) => targetAssignments.get(item.id) !== item.containerIndex)
-      .forEach((item) => {
-        const containerIndex = targetAssignments.get(item.id);
-        if (
-          containerIndex !== undefined &&
-          containerIndex !== null &&
-          containerIndex < comboSize
-        ) {
-          pendingByContainer[containerIndex]!.push(item.id);
-        }
-      });
-
-    const comboAssignments = Array.from(
-      { length: Math.max(...pendingByContainer.map((bucket) => bucket.length), 0) },
-      (_, rowIndex) =>
-        pendingByContainer
-          .map((bucket, containerIndex) => {
-            const itemId = bucket[rowIndex];
-            return itemId === undefined
-              ? null
-              : { itemId, containerIndex };
-          })
-          .filter(
-            (
-              entry,
-            ): entry is {
-              itemId: number;
-              containerIndex: number;
-            } => entry !== null,
-          ),
-    ).filter((group) => group.length > 0);
-
-    const DEMO_STEP_MS = 720;
-    const DEMO_DROP_DELAY_MS = 260;
-
-    comboAssignments.forEach((group, index) => {
-      window.setTimeout(() => {
-        const orderedGroup = group.slice().sort((left, right) => left.containerIndex - right.containerIndex);
-        const leadItemCenter = getScreenCenter(itemRefs.current[orderedGroup[0]!.itemId]);
-        setSelectedItemIds(orderedGroup.map((entry) => entry.itemId));
-        const comboId = nextComboIdRef.current;
-        nextComboIdRef.current += 1;
-
-        const itemCenter = leadItemCenter;
-        if (itemCenter) {
-          setPhantomPos({ ...itemCenter, isClicking: false });
-        }
-
-        window.setTimeout(() => {
-          const targetCenter = getScreenCenter(containerRefs.current[0]);
-          if (targetCenter) {
-            setPhantomPos({ ...targetCenter, isClicking: true });
-          }
-          stageComboIntoTopBox(
-            orderedGroup.map((entry) => entry.itemId),
-            orderedGroup.map((entry) => entry.containerIndex),
-            comboId,
-            targetCenter
-              ? { x: targetCenter.x - 32, y: targetCenter.y - 32 }
-              : undefined,
-          );
-        }, DEMO_DROP_DELAY_MS);
-      }, index * DEMO_STEP_MS);
-    });
-
-    window.setTimeout(
-      () => {
-        setSelectedItemIds([]);
-        setShowUnitReveal(true);
-        setTypedStepLengths([]);
-        setShowNextQuestionButton(false);
-        setRevealCtaMode("retry");
-        setPhantomPos(null);
-        setIsQuestionDemo(false);
-      },
-      comboAssignments.length * DEMO_STEP_MS + 700,
-    );
+    runQuestionAutopilot("retry");
   }
 
   function animateItemsBackToSource() {
@@ -1157,11 +1798,113 @@ export default function PackItScreen() {
     setIsQuestionDemo(false);
     setHoveredSourceArea(false);
     setSelectedItemIds([]);
+    setDisplayTopBoxCount(0);
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+    setIsCalculatorAdjusting(false);
+    clearKeypadAdjustTimers();
   }
 
   function handleNowYourTurn() {
     handleRestart();
   }
+
+  useEffect(() => {
+    function handleCheatCodes(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        target?.isContentEditable ||
+        !/^\d$/.test(event.key)
+      ) {
+        return;
+      }
+
+      cheatBufferRef.current = `${cheatBufferRef.current}${event.key}`.slice(
+        -6,
+      );
+
+      if (cheatBufferRef.current === "197879") {
+        revealAnswerForCurrentQuestion();
+        cheatBufferRef.current = "";
+        return;
+      }
+
+      if (cheatBufferRef.current === "198081") {
+        clearKeypadAdjustTimers();
+        if (displaySyncLockRef.current !== null) {
+          window.clearTimeout(displaySyncLockRef.current);
+          displaySyncLockRef.current = null;
+        }
+        setCalculatorInput("0");
+        setCalculatorOverride(false);
+        setDisplayTopBoxCount(0);
+        continuousAutopilotStartIndexRef.current = questionIndex;
+        setIsContinuousAutopilot(true);
+        cheatBufferRef.current = "";
+        if (!questionSolved && !isQuestionDemo && revealCtaMode !== "retry") {
+          runQuestionAutopilot("solve");
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleCheatCodes);
+    return () => {
+      window.removeEventListener("keydown", handleCheatCodes);
+    };
+  }, [question.unitRate]);
+
+  useEffect(() => {
+    if (!isContinuousAutopilot) {
+      return;
+    }
+
+    const solvedCount =
+      questionIndex -
+      continuousAutopilotStartIndexRef.current +
+      (questionSolved ? 1 : 0);
+
+    if (isRoundComplete) {
+      setIsContinuousAutopilot(false);
+      setPhantomPos(null);
+      return;
+    }
+
+    if (questionSolved && showNextQuestionButton && revealCtaMode === "next") {
+      if (solvedCount >= AUTOPILOT_QUESTION_COUNT) {
+        setIsContinuousAutopilot(false);
+        return;
+      }
+      if (autopilotAdvanceTimerRef.current !== null) {
+        window.clearTimeout(autopilotAdvanceTimerRef.current);
+      }
+      autopilotAdvanceTimerRef.current = window.setTimeout(() => {
+        autopilotAdvanceTimerRef.current = null;
+        goToNextQuestion();
+      }, 800);
+      return;
+    }
+
+    if (!questionSolved && !isQuestionDemo && revealCtaMode !== "retry") {
+      if (continuousAutopilotStartTimerRef.current !== null) {
+        window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      }
+      continuousAutopilotStartTimerRef.current = window.setTimeout(() => {
+        continuousAutopilotStartTimerRef.current = null;
+        runQuestionAutopilot("solve");
+      }, 0);
+    }
+  }, [
+    isContinuousAutopilot,
+    isQuestionDemo,
+    isRoundComplete,
+    questionIndex,
+    questionSolved,
+    revealCtaMode,
+    showNextQuestionButton,
+  ]);
 
   const visibleStepLines = showUnitReveal
     ? question.blackboardSteps
@@ -1172,18 +1915,38 @@ export default function PackItScreen() {
     ? ""
     : question.questionText.slice(0, typedQuestionLength);
 
-  const questionPanel = (
-    <div className="flex h-full min-h-[10.5rem] gap-0">
+  const questionPanel = ({
+    calculatorMinimized,
+    toggleCalculatorMinimized,
+  }: {
+    calculatorMinimized: boolean;
+    toggleCalculatorMinimized: () => void;
+  }) => (
+    <div
+      className="flex h-full gap-0"
+      style={{
+        height: calculatorMinimized ? "4.5rem" : undefined,
+        minHeight: calculatorMinimized ? "4.5rem" : "10.5rem",
+        transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
+      }}
+    >
       <div
-        className="font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-[1.1rem] border-[3px] border-slate-400 bg-slate-900"
+        className="font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-[1.1rem] border-[3px] border-slate-400 bg-slate-950"
         style={{
           boxShadow:
             "0 0 0 2px rgba(15,23,42,0.55), 0 10px 24px rgba(2,6,23,0.38)",
         }}
       >
         <div
-          className="flex min-h-[4.25rem] items-center px-5 py-2 text-[1.15rem] font-semibold leading-relaxed text-white"
-          style={{ letterSpacing: "0.015em" }}
+          className="flex cursor-pointer items-center bg-slate-900 px-5 text-[1.15rem] font-semibold leading-relaxed text-white"
+          onClick={toggleCalculatorMinimized}
+          style={{
+            minHeight: calculatorMinimized ? "100%" : "4.25rem",
+            paddingTop: calculatorMinimized ? "0.25rem" : "0.5rem",
+            paddingBottom: calculatorMinimized ? "0.25rem" : "0.5rem",
+            transition: `min-height ${DOCK_TRANSITION}, padding ${DOCK_TRANSITION}`,
+            letterSpacing: "0.015em",
+          }}
         >
           {isRoundComplete ? (
             <span style={{ color: "#facc15" }}>
@@ -1193,310 +1956,378 @@ export default function PackItScreen() {
             renderHighlightedQuestion(visibleQuestionText)
           )}
         </div>
-        <div className="border-t border-slate-500/90" />
-        <div className="min-h-[5.6rem] flex-1 bg-slate-950 px-5 py-4 text-[1.05rem] font-semibold leading-relaxed text-slate-100">
-          {visibleStepLines.length > 0
-            ? visibleStepLines.map((line, index) => {
-                const isLastVisibleLine = index === visibleStepLines.length - 1;
-                const isFinalLine =
-                  index === question.blackboardSteps.length - 1 &&
-                  (typedStepLengths[index] ?? 0) >= question.blackboardSteps[index]!.length;
-                return (
-                  <div key={`${index}-${line}`}>
-                    {renderHighlightedQuestion(line)}
-                    {isLastVisibleLine && isFinalLine && showNextQuestionButton ? (
-                      <button
-                        type="button"
-                        onClick={
-                          revealCtaMode === "retry"
-                            ? handleNowYourTurn
-                            : goToNextQuestion
-                        }
-                        className="ml-4 inline-flex h-[2rem] items-center rounded-full border-[3px] border-yellow-300 bg-orange-700 px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle"
-                        style={{
-                          boxShadow:
-                            "0 0 10px rgba(250,204,21,0.18), 0 0 0 2px rgba(124,45,18,0.45)",
-                        }}
-                      >
-                        {revealCtaMode === "retry" ? "Now you try it" : "Next question"}
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              })
-            : null}
+        <div
+          className="flex-1 bg-slate-950"
+          style={{
+            maxHeight: calculatorMinimized ? "0px" : "14rem",
+            opacity: calculatorMinimized ? 0 : 1,
+            overflow: "hidden",
+            transition: `max-height ${DOCK_TRANSITION}, opacity ${DOCK_TRANSITION}`,
+          }}
+        >
+          <div className="border-t border-slate-500/90" />
+          <div className="min-h-[5.6rem] h-full bg-slate-950 px-5 py-4 text-[1.05rem] font-semibold leading-relaxed text-slate-100">
+            {visibleStepLines.length > 0
+              ? visibleStepLines.map((line, index) => {
+                  const isLastVisibleLine =
+                    index === visibleStepLines.length - 1;
+                  const isFinalLine =
+                    index === question.blackboardSteps.length - 1 &&
+                    (typedStepLengths[index] ?? 0) >=
+                      question.blackboardSteps[index]!.length;
+                  return (
+                    <div key={`${index}-${line}`}>
+                      {renderHighlightedQuestion(line)}
+                      {isLastVisibleLine &&
+                      isFinalLine &&
+                      showNextQuestionButton ? (
+                        <button
+                          type="button"
+                          onClick={
+                            revealCtaMode === "retry"
+                              ? handleNowYourTurn
+                              : goToNextQuestion
+                          }
+                          className="ml-4 inline-flex h-[2rem] items-center rounded-full border-[3px] border-yellow-300 bg-orange-700 px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle"
+                          style={{
+                            boxShadow:
+                              "0 0 10px rgba(250,204,21,0.18), 0 0 0 2px rgba(124,45,18,0.45)",
+                          }}
+                        >
+                          {revealCtaMode === "retry"
+                            ? "Now you try it"
+                            : "Next question"}
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })
+              : null}
+          </div>
         </div>
       </div>
     </div>
   );
 
   return (
-    <GameLayout
-      muted={muted}
-      onToggleMute={handleToggleMute}
-      onRestart={handleRestart}
-      keypadValue={showUnitReveal ? String(question.unitRate) : ""}
-      onKeypadChange={() => {}}
-      onCapture={handleCapture}
-      onToggleSquareSnip={toggleSquareSnip}
-      squareSnipActive={snipMode}
-      onRecordDemo={handleRecordDemo}
-      isRecordingDemo={isRecordingDemo}
-      onQuestionDemo={solveCurrentQuestion}
-      isQuestionDemo={isQuestionDemo}
-      onKeypadSubmit={handleSubmitAnswer}
-      canSubmit={canSubmit}
-      forceKeypadExpanded
-      progress={questionIndex + (questionSolved ? 1 : 0)}
-      progressTotal={QUESTION_COUNT}
-      levelCount={4}
-      currentLevel={1}
-      unlockedLevel={1}
-      questionPanel={questionPanel}
-    >
-      <div
-        ref={rootRef}
-        className="h-full w-full overflow-hidden bg-slate-950"
-        onPointerDownCapture={ensureAudioReady}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onClick={moveSnip}
-      >
-        <div className="flex h-full flex-col px-6 pb-[14.5rem] pt-[3.6rem]">
-          <div className="relative flex-1 overflow-hidden bg-transparent">
-            {false ? (
-              <div
-                className="pointer-events-none absolute left-1/2 z-[8] -translate-x-1/2"
-                style={{ top: "-0.75rem" }}
-              >
-                <button
-                  type="button"
-                  className="pointer-events-auto rounded-full border-[3px] border-yellow-300 bg-slate-900 px-6 py-2 font-arcade text-[1rem] font-bold text-yellow-200"
-                  style={{
-                    boxShadow:
-                      "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
-                  }}
-                  onClick={animateItemsBackToSource}
-                >
-                  Now you try it
-                </button>
-              </div>
-            ) : null}
-            <div
-              className="pointer-events-none absolute z-[1] w-[2px] bg-white"
-              style={{ left: "45.5%", top: "4%", height: "93%", opacity: 0.2 }}
-            />
-            <div
-              className="pointer-events-none absolute left-0 right-0 z-[1] h-[2px] bg-white"
-              style={{ top: "90%", opacity: 0.2 }}
-            />
-            <div
-              className="pointer-events-none absolute left-0 right-0 z-[2]"
-              style={{ top: "calc(92.5% - 4px)" }}
-            >
-              <div className="grid grid-cols-2">
-                <div className="flex justify-center">
-                  <DigitalCount value={remainingItems.length} />
-                </div>
-                <div className="flex justify-center">
-                  <DigitalCount value={packedItemsTotal} />
-                </div>
-              </div>
-            </div>
-
-            <div className="relative z-[3] grid h-full grid-cols-[45.5%_calc(54.5%-2rem)] gap-8 px-0 pb-3 pt-7">
-              <div
-                ref={sourceAreaRef}
-                className="relative h-full bg-transparent pl-4 pr-5 pt-4"
-                style={{
-                  boxShadow: hoveredSourceArea
-                    ? "inset 0 0 0 2px rgba(250,204,21,0.45), 0 0 18px rgba(250,204,21,0.18)"
-                    : "none",
-                }}
-              >
-                <div className="flex min-h-[7rem] flex-wrap content-start justify-start gap-4">
-                  {items
-                    .slice()
-                    .sort((a, b) => a.id - b.id)
-                    .map((item) =>
-                      item.containerIndex === null ? (
-                        <button
-                          key={item.id}
-                          ref={(node) => {
-                            itemRefs.current[item.id] = node;
-                          }}
-                          type="button"
-                          aria-label={`${question.pair.item} ${item.id + 1}`}
-                          onPointerDown={(event) =>
-                            handlePointerDown(item.id, event)
-                          }
-                          className="relative flex h-16 w-16 items-center justify-center rounded-full border-0 bg-transparent text-[3.1rem] outline-none transition-transform active:scale-95 focus:outline-none"
-                          style={{
-                            appearance: "none",
-                            WebkitAppearance: "none",
-                            boxShadow: "none",
-                            opacity:
-                              (dragState?.isLifted && draggedItemIds.has(item.id)) ||
-                              returningItemIds.has(item.id)
-                                ? 0
-                                : 1,
-                            pointerEvents: revealCtaMode === "retry" || isQuestionDemo ? "none" : "auto",
-                          }}
-                        >
-                          {selectedItemIdSet.has(item.id) && !dragState?.isLifted ? (
-                            <span
-                              className="pointer-events-none absolute inset-0 rounded-full"
-                              style={{
-                                boxShadow:
-                                  "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                                transform: "translateY(-4px)",
-                              }}
-                            />
-                          ) : null}
-                          <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
-                            {question.pair.itemEmoji}
-                          </span>
-                        </button>
-                      ) : (
-                        <div
-                          key={item.id}
-                          aria-hidden="true"
-                          className="h-16 w-16 shrink-0"
-                        />
-                      ),
-                    )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 content-start pt-1">
-                {containers.map((containerItems, index) => (
-                  (() => {
-                    const isHovered =
-                      hoveredContainerIndex === index &&
-                      dragState?.origin === "source";
-                    const isDisabledBox = index !== 0;
-                    const isOverfilled = containerItems.length > question.unitRate;
-                    const isCorrect = containerItems.length === question.unitRate;
-                    const borderColor = isHovered
-                      ? "#facc15"
-                      : isOverfilled
-                        ? "#f87171"
-                        : isCorrect
-                          ? "#86efac"
-                          : isDisabledBox
-                            ? "rgba(100,116,139,0.4)"
-                            : "#475569";
-                    const counterColor = isOverfilled
-                      ? "#f87171"
-                      : isCorrect
-                        ? "#86efac"
-                        : isDisabledBox
-                          ? "rgba(103,232,249,0.42)"
-                          : "#67e8f9";
-                    const counterGlow = isOverfilled
-                      ? "rgba(248,113,113,0.72)"
-                      : isCorrect
-                        ? "rgba(134,239,172,0.72)"
-                        : isDisabledBox
-                          ? "rgba(103,232,249,0.28)"
-                          : "rgba(103,232,249,0.72)";
-                    const counterGlowOuter = isOverfilled
-                      ? "rgba(239,68,68,0.26)"
-                      : isCorrect
-                        ? "rgba(34,197,94,0.26)"
-                        : isDisabledBox
-                          ? "rgba(56,189,248,0.1)"
-                          : "rgba(56,189,248,0.26)";
-
-                    return (
+    <>
+      <GameLayout
+        muted={muted}
+        onToggleMute={handleToggleMute}
+        onRestart={handleRestart}
+        keypadValue={
+          calculatorOverride ? calculatorInput : String(displayTopBoxCount)
+        }
+        onKeypadChange={handleCalculatorChange}
+        onKeypadKeyInput={handleCalculatorKeyInput}
+        onCapture={handleCapture}
+        onToggleSquareSnip={toggleSquareSnip}
+        squareSnipActive={snipMode}
+        onRecordDemo={handleRecordDemo}
+        isRecordingDemo={isRecordingDemo}
+        onQuestionDemo={solveCurrentQuestion}
+        isQuestionDemo={isQuestionDemo}
+        onKeypadSubmit={handleSubmitAnswer}
+        canSubmit={canSubmit}
+        progress={autopilotProgress}
+        progressTotal={progressTotal}
+        levelCount={4}
+        currentLevel={1}
+        unlockedLevel={1}
+        questionPanel={questionPanel}
+        children={() => (
+          <div
+            ref={rootRef}
+            data-pack-it-capture-root="true"
+            className="h-full w-full overflow-hidden bg-slate-950"
+            onPointerDownCapture={ensureAudioReady}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onClick={moveSnip}
+          >
+            <div className="flex h-full flex-col px-6 pb-3 pt-[3.6rem]">
+              <div className="relative flex-1 overflow-hidden bg-transparent">
+                {false ? (
                   <div
-                    key={`${questionIndex}-${index}`}
-                    ref={(node) => {
-                      containerRefs.current[index] = node;
-                    }}
-                    className="relative min-h-[5rem] overflow-hidden rounded-[1.35rem] border-[3px] px-4 py-[0.35rem]"
-                    style={{
-                      borderColor,
-                      background: "transparent",
-                      boxShadow: isHovered
-                        ? "0 0 18px rgba(250,204,21,0.3)"
-                        : isDisabledBox
-                          ? "none"
-                          : "none",
-                      opacity: isDisabledBox ? 0.78 : 1,
-                    }}
+                    className="pointer-events-none absolute left-1/2 z-[8] -translate-x-1/2"
+                    style={{ top: "-0.75rem" }}
                   >
-                    <div className="pointer-events-none absolute right-4 top-1/2 z-[2] -translate-y-1/2">
-                      <DigitalCount
-                        value={containerItems.length}
-                        color={counterColor}
-                        glow={counterGlow}
-                        glowOuter={counterGlowOuter}
-                      />
+                    <button
+                      type="button"
+                      className="pointer-events-auto rounded-full border-[3px] border-yellow-300 bg-slate-900 px-6 py-2 font-arcade text-[1rem] font-bold text-yellow-200"
+                      style={{
+                        boxShadow:
+                          "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
+                      }}
+                      onClick={animateItemsBackToSource}
+                    >
+                      Now you try it
+                    </button>
+                  </div>
+                ) : null}
+                <div
+                  className="pointer-events-none absolute z-[1] w-[2px] bg-white"
+                  style={{
+                    left: "46.25%",
+                    top: "0",
+                    height: "99%",
+                    opacity: 0.2,
+                  }}
+                />
+                <div
+                  className="pointer-events-none absolute left-0 right-0 z-[1] h-[2px] bg-white"
+                  style={{ top: "91%", opacity: 0.2 }}
+                />
+                <div
+                  className="pointer-events-none absolute left-0 right-0 z-[2]"
+                  style={{ top: "calc(94.25% - 4px)" }}
+                >
+                  <div className="grid grid-cols-2">
+                    <div className="flex justify-center">
+                      <DigitalCount value={remainingItems.length} />
                     </div>
-                    <div className="flex min-h-[3.15rem] max-w-[calc(100%-5.5rem)] flex-wrap items-center content-center justify-start gap-2 pr-2">
-                      {containerItems.map((item) => (
-                        <button
-                          key={item.id}
-                          ref={(node) => {
-                            itemRefs.current[item.id] = node;
-                          }}
-                          type="button"
-                          aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
-                          onPointerDown={(event) =>
-                            index === 0 ? handlePointerDown(item.id, event) : undefined
-                          }
-                          className="relative flex h-16 w-16 items-center justify-center bg-transparent text-[3.1rem]"
-                          style={{
-                            opacity:
-                              (dragState?.isLifted && draggedItemIds.has(item.id)) ||
-                              returningItemIds.has(item.id)
-                                ? 0
-                                : isDisabledBox
-                                  ? 0.46
-                                  : 1,
-                            pointerEvents:
-                              revealCtaMode === "retry" ||
-                              isQuestionDemo ||
-                              index !== 0
-                                ? "none"
-                                : "auto",
-                          }}
-                        >
-                          {selectedItemIdSet.has(item.id) && !dragState?.isLifted ? (
-                            <span
-                              className="pointer-events-none absolute inset-0 rounded-full"
-                              style={{
-                                boxShadow:
-                                  "0 0 0 3px rgba(250,204,21,0.82), 0 0 0 8px rgba(250,204,21,0.14), 0 0 14px rgba(250,204,21,0.2)",
-                                transform: "translateY(-4px)",
-                              }}
-                            />
-                          ) : null}
-                          {question.pair.itemEmoji}
-                        </button>
-                      ))}
+                    <div className="flex justify-center">
+                      <DigitalCount value={packedItemsTotal} />
                     </div>
                   </div>
-                    );
-                  })()
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {dragState?.isLifted ? (
-              <div
-                aria-hidden="true"
-                className="pointer-events-none fixed z-[70] flex items-center gap-2 rounded-full bg-transparent"
-                style={{
-                  left: dragState.x,
-                  top: dragState.y,
-                }}
-              >
-                {dragState.itemIds.map((itemId) => (
-                  <span
-                    key={`drag-${itemId}`}
-                    className="relative flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                <div className="relative z-[3] grid h-full grid-cols-[45.5%_calc(54.5%-2rem)] gap-8 px-0 pb-3 pt-7">
+                  <div
+                    ref={sourceAreaRef}
+                    className="relative h-full bg-transparent pl-4 pr-5 pt-4"
+                    style={{
+                      boxShadow: hoveredSourceArea
+                        ? "inset 0 0 0 2px rgba(250,204,21,0.45), 0 0 18px rgba(250,204,21,0.18)"
+                        : "none",
+                    }}
+                  >
+                    <div className="flex min-h-[7rem] flex-wrap content-start justify-start gap-4">
+                      {items
+                        .slice()
+                        .sort((a, b) => a.id - b.id)
+                        .map((item) =>
+                          item.containerIndex === null ? (
+                            <button
+                              key={item.id}
+                              ref={(node) => {
+                                itemRefs.current[item.id] = node;
+                              }}
+                              type="button"
+                              aria-label={`${question.pair.item} ${item.id + 1}`}
+                              onPointerDown={(event) =>
+                                handlePointerDown(item.id, event)
+                              }
+                              className="relative flex h-16 w-16 items-center justify-center rounded-full border-0 bg-transparent text-[3.1rem] outline-none transition-transform active:scale-95 focus:outline-none"
+                              style={{
+                                appearance: "none",
+                                WebkitAppearance: "none",
+                                boxShadow: "none",
+                                opacity:
+                                  (dragState?.isLifted &&
+                                    draggedItemIds.has(item.id)) ||
+                                  returningItemIds.has(item.id)
+                                    ? 0
+                                    : 1,
+                                pointerEvents:
+                                  revealCtaMode === "retry" || isQuestionDemo
+                                    ? "none"
+                                    : "auto",
+                              }}
+                            >
+                              {selectedItemIdSet.has(item.id) &&
+                              !dragState?.isLifted ? (
+                                <span
+                                  className="pointer-events-none absolute inset-0 rounded-full"
+                                  style={{
+                                    boxShadow:
+                                      "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                                    transform: "translateY(-4px)",
+                                  }}
+                                />
+                              ) : null}
+                              <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                                {question.pair.itemEmoji}
+                              </span>
+                            </button>
+                          ) : (
+                            <div
+                              key={item.id}
+                              aria-hidden="true"
+                              className="h-16 w-16 shrink-0"
+                            />
+                          ),
+                        )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 content-start pt-1">
+                    {containers.map((containerItems, index) =>
+                      (() => {
+                        const isHovered =
+                          hoveredContainerIndex === index &&
+                          dragState?.origin === "source";
+                        const isDisabledBox = index !== 0;
+                        const isOverfilled =
+                          containerItems.length > question.unitRate;
+                        const isCorrect =
+                          containerItems.length === question.unitRate;
+                        const borderColor = isHovered
+                          ? "#facc15"
+                          : isOverfilled
+                            ? "#f87171"
+                            : isCorrect
+                              ? "#86efac"
+                              : isDisabledBox
+                                ? "rgba(100,116,139,0.4)"
+                                : "#475569";
+                        const counterColor = isOverfilled
+                          ? "#f87171"
+                          : isCorrect
+                            ? "#86efac"
+                            : isDisabledBox
+                              ? "rgba(103,232,249,0.42)"
+                              : "#67e8f9";
+                        const counterGlow = isOverfilled
+                          ? "rgba(248,113,113,0.72)"
+                          : isCorrect
+                            ? "rgba(134,239,172,0.72)"
+                            : isDisabledBox
+                              ? "rgba(103,232,249,0.28)"
+                              : "rgba(103,232,249,0.72)";
+                        const counterGlowOuter = isOverfilled
+                          ? "rgba(239,68,68,0.26)"
+                          : isCorrect
+                            ? "rgba(34,197,94,0.26)"
+                            : isDisabledBox
+                              ? "rgba(56,189,248,0.1)"
+                              : "rgba(56,189,248,0.26)";
+
+                        return (
+                          <div
+                            key={`${questionIndex}-${index}`}
+                            ref={(node) => {
+                              containerRefs.current[index] = node;
+                            }}
+                            className="relative min-h-[5rem] overflow-hidden rounded-[1.35rem] border-[3px] px-4 py-[0.35rem]"
+                            style={{
+                              borderColor,
+                              background: "transparent",
+                              boxShadow: isHovered
+                                ? "0 0 18px rgba(250,204,21,0.3)"
+                                : isDisabledBox
+                                  ? "none"
+                                  : "none",
+                              opacity: isDisabledBox ? 0.78 : 1,
+                            }}
+                          >
+                            <div className="pointer-events-none absolute right-4 top-1/2 z-[2] -translate-y-1/2">
+                              <DigitalCount
+                                value={containerItems.length}
+                                color={counterColor}
+                                glow={counterGlow}
+                                glowOuter={counterGlowOuter}
+                              />
+                            </div>
+                            <div className="flex min-h-[3.15rem] max-w-[calc(100%-5.5rem)] flex-wrap items-center content-center justify-start gap-2 pr-2">
+                              {containerItems.map((item) => (
+                                <button
+                                  key={item.id}
+                                  ref={(node) => {
+                                    itemRefs.current[item.id] = node;
+                                  }}
+                                  type="button"
+                                  aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
+                                  onPointerDown={(event) =>
+                                    index === 0
+                                      ? handlePointerDown(item.id, event)
+                                      : undefined
+                                  }
+                                  className="relative flex h-16 w-16 items-center justify-center bg-transparent text-[3.1rem] leading-none"
+                                  style={{
+                                    opacity:
+                                      (dragState?.isLifted &&
+                                        draggedItemIds.has(item.id)) ||
+                                      returningItemIds.has(item.id)
+                                        ? 0
+                                        : isDisabledBox
+                                          ? 0.46
+                                          : 1,
+                                    pointerEvents:
+                                      revealCtaMode === "retry" ||
+                                      isQuestionDemo ||
+                                      index !== 0
+                                        ? "none"
+                                        : "auto",
+                                  }}
+                                >
+                                  {selectedItemIdSet.has(item.id) &&
+                                  !dragState?.isLifted ? (
+                                    <span
+                                      className="pointer-events-none absolute inset-0 rounded-full"
+                                      style={{
+                                        boxShadow:
+                                          "0 0 0 3px rgba(250,204,21,0.82), 0 0 0 8px rgba(250,204,21,0.14), 0 0 14px rgba(250,204,21,0.2)",
+                                        transform: "translateY(-4px)",
+                                      }}
+                                    />
+                                  ) : null}
+                                  <span
+                                    className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                                    style={{ transform: "translateY(4px)" }}
+                                  >
+                                    {question.pair.itemEmoji}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })(),
+                    )}
+                  </div>
+                </div>
+
+                {dragState?.isLifted ? (
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none fixed z-[70] flex items-center gap-2 rounded-full bg-transparent"
+                    style={{
+                      left: dragState.x,
+                      top: dragState.y,
+                    }}
+                  >
+                    {dragState.itemIds.map((itemId) => (
+                      <span
+                        key={`drag-${itemId}`}
+                        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                      >
+                        <span
+                          className="pointer-events-none absolute inset-0 rounded-full"
+                          style={{
+                            boxShadow:
+                              "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                            transform: "translateY(-4px)",
+                          }}
+                        />
+                        <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                          {question.pair.itemEmoji}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {returnStates.map((returnState) => (
+                  <div
+                    key={`return-${returnState.itemId}`}
+                    aria-hidden="true"
+                    className="pointer-events-none fixed z-[69] flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                    style={{
+                      left: returnState.x,
+                      top: returnState.y,
+                      transition: `left ${returnState.durationMs ?? 220}ms ease-out, top ${returnState.durationMs ?? 220}ms ease-out`,
+                    }}
                   >
                     <span
                       className="pointer-events-none absolute inset-0 rounded-full"
@@ -1509,54 +2340,29 @@ export default function PackItScreen() {
                     <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
                       {question.pair.itemEmoji}
                     </span>
-                  </span>
+                  </div>
                 ))}
-              </div>
-            ) : null}
 
-            {returnStates.map((returnState) => (
-              <div
-                key={`return-${returnState.itemId}`}
-                aria-hidden="true"
-                className="pointer-events-none fixed z-[69] flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
-                style={{
-                  left: returnState.x,
-                  top: returnState.y,
-                  transition: `left ${returnState.durationMs ?? 220}ms ease-out, top ${returnState.durationMs ?? 220}ms ease-out`,
-                }}
-              >
-                <span
-                  className="pointer-events-none absolute inset-0 rounded-full"
-                  style={{
-                    boxShadow:
-                      "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                    transform: "translateY(-4px)",
-                  }}
-                />
-                <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
-                  {question.pair.itemEmoji}
-                </span>
+                {snipMode ? (
+                  <div
+                    className="pointer-events-none absolute z-[76] rounded-2xl border-4 border-sky-300"
+                    style={{
+                      left: snipSelection.x,
+                      top: snipSelection.y,
+                      width: snipSelection.size,
+                      height: snipSelection.size,
+                      background: "rgba(14, 165, 233, 0.08)",
+                      boxShadow: "0 0 0 9999px rgba(15,23,42,0.22)",
+                    }}
+                  />
+                ) : null}
               </div>
-            ))}
+            </div>
 
-            {snipMode ? (
-              <div
-                className="pointer-events-none absolute z-[76] rounded-2xl border-4 border-sky-300"
-                style={{
-                  left: snipSelection.x,
-                  top: snipSelection.y,
-                  width: snipSelection.size,
-                  height: snipSelection.size,
-                  background: "rgba(14, 165, 233, 0.08)",
-                  boxShadow: "0 0 0 9999px rgba(15,23,42,0.22)",
-                }}
-              />
-            ) : null}
+            <PhantomHand pos={phantomPos} />
           </div>
-        </div>
-
-        <PhantomHand pos={phantomPos} />
-      </div>
+        )}
+      />
       {flash?.icon &&
         typeof document !== "undefined" &&
         createPortal(
@@ -1613,6 +2419,6 @@ export default function PackItScreen() {
           </div>,
           document.body,
         )}
-    </GameLayout>
+    </>
   );
 }

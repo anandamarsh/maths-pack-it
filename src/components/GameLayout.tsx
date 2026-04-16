@@ -51,7 +51,12 @@ interface GameLayoutProps {
 
   // Question bar (optional)
   question?: ReactNode;
-  questionPanel?: ReactNode;
+  questionPanel?:
+    | ReactNode
+    | ((state: {
+        calculatorMinimized: boolean;
+        toggleCalculatorMinimized: () => void;
+      }) => ReactNode);
   questionShake?: boolean;
 
   // Progress dots (optional)
@@ -82,7 +87,12 @@ interface GameLayoutProps {
   forceKeypadExpanded?: boolean;
 
   // Game canvas
-  children: ReactNode;
+  children:
+    | ReactNode
+    | ((state: {
+        calculatorMinimized: boolean;
+        toggleCalculatorMinimized: () => void;
+      }) => ReactNode);
 }
 
 export default function GameLayout({
@@ -190,6 +200,8 @@ export default function GameLayout({
     progress !== undefined && progressTotal !== undefined
       ? Array.from({ length: progressTotal }, (_, i) => i < progress)
       : null;
+  const dockHeight = effectiveCalcMinimized ? "4.5rem" : "15.25rem";
+  const dockTransition = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
   return (
     <div
@@ -456,8 +468,19 @@ export default function GameLayout({
       <div className="relative flex-1 min-h-0 mx-2 mb-2">
 
         {/* Canvas — always fills the full rest area */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden">
-          {children}
+        <div
+          className="absolute left-0 right-0 top-0 rounded-xl overflow-hidden"
+          style={{
+            bottom: dockHeight,
+            transition: `bottom ${dockTransition}`,
+          }}
+        >
+          {typeof children === "function"
+            ? children({
+                calculatorMinimized: effectiveCalcMinimized,
+                toggleCalculatorMinimized: toggleCalc,
+              })
+            : children}
         </div>
 
         {demoBanner ? (
@@ -490,11 +513,24 @@ export default function GameLayout({
         ) : null}
 
         {/* Bottom overlay — floats over canvas, anchored to bottom */}
-        <div className="absolute bottom-0 left-0 right-0 flex flex-row items-stretch gap-2">
+        <div
+          className="absolute bottom-0 left-0 right-0 flex flex-row items-stretch gap-2"
+          style={{
+            height: dockHeight,
+            transition: `height ${dockTransition}`,
+          }}
+        >
 
           {/* Message box — same height as calculator, click = toggle */}
           {questionPanel !== undefined ? (
-            <div className="flex-1 min-w-0">{questionPanel}</div>
+            <div className="flex-1 min-w-0">
+              {typeof questionPanel === "function"
+                ? questionPanel({
+                    calculatorMinimized: effectiveCalcMinimized,
+                    toggleCalculatorMinimized: toggleCalc,
+                  })
+                : questionPanel}
+            </div>
           ) : question !== undefined ? (
             <div className="flex-1 min-w-0">
               <QuestionBox shake={questionShake} onClick={toggleCalc}>
@@ -505,7 +541,7 @@ export default function GameLayout({
 
           {/* Calculator */}
           {!hideKeypad && (
-            <div className="flex min-h-0 flex-col self-start">
+            <div className="flex h-full min-h-0 flex-col self-start">
               {calculatorTopBanner ? (
               <div
                 className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"

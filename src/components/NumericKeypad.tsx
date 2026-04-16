@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIsCoarsePointer, useIsMobileLandscape } from "../hooks/useMediaQuery";
 import { playKeyClick } from "../sound";
 
 const DISPLAY_FONT_SIZE = "2.1rem";
+const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
 interface NumericKeypadProps {
   value: string;
@@ -67,6 +68,52 @@ export default function NumericKeypad({
   };
   const width = isMobileLandscape ? "w-[16.25rem]" : "w-[12.5rem] md:w-[13.75rem]";
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      if (/^\d$/.test(event.key)) {
+        event.preventDefault();
+        press(event.key);
+        return;
+      }
+
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        press("⌫");
+        return;
+      }
+
+      if (event.key === "." || event.key === "Decimal") {
+        event.preventDefault();
+        press(".");
+        return;
+      }
+
+      if (event.key === "Enter" || event.key === "=") {
+        if (!canSubmit) {
+          return;
+        }
+        event.preventDefault();
+        playKeyClick();
+        onSubmit?.();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [canSubmit, onSubmit, value]);
+
   return (
     <div
       className={`relative flex min-h-0 min-w-0 ${width} shrink-0 flex-col rounded-xl p-1.5 gap-1`}
@@ -104,7 +151,7 @@ export default function NumericKeypad({
           maxHeight: minimized ? "0px" : "400px",
           opacity: minimized ? 0 : 1,
           pointerEvents: minimized ? "none" : "auto",
-          transition: "max-height 0.4s ease-in-out, opacity 0.3s ease-in-out",
+          transition: `max-height ${DOCK_TRANSITION}, opacity ${DOCK_TRANSITION}`,
         }}
       >
         {rows.map((row, r) => (
