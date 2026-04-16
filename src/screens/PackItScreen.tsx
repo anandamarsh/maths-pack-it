@@ -49,6 +49,14 @@ type SquareSnip = {
   size: number;
 };
 
+type SnipDragState = {
+  mode: "move" | "resize";
+  pointerId: number;
+  startX: number;
+  startY: number;
+  initial: SquareSnip;
+};
+
 type FlashFeedback = {
   ok: boolean;
   icon: true;
@@ -201,6 +209,11 @@ function DigitalCount({
 }
 
 let captureColorProbe: HTMLDivElement | null = null;
+const UNSUPPORTED_CAPTURE_COLOR_PATTERN = /oklab\([^)]*\)|oklch\([^)]*\)/i;
+
+function hasUnsupportedCaptureColor(value: string) {
+  return UNSUPPORTED_CAPTURE_COLOR_PATTERN.test(value);
+}
 
 function getCaptureColorProbe() {
   if (typeof document === "undefined") {
@@ -224,7 +237,7 @@ function getCaptureColorProbe() {
 }
 
 function normalizeCaptureColor(value: string) {
-  if (!value || !value.includes("oklch(")) {
+  if (!value || !hasUnsupportedCaptureColor(value)) {
     return value;
   }
 
@@ -237,14 +250,14 @@ function normalizeCaptureColor(value: string) {
     probe.style.color = "rgb(0, 0, 1)";
     probe.style.color = value;
     const normalized = window.getComputedStyle(probe).color;
-    return normalized.includes("oklch(") ? null : normalized;
+    return hasUnsupportedCaptureColor(normalized) ? null : normalized;
   } catch {
     return null;
   }
 }
 
 function sanitizeCaptureValue(property: string, value: string) {
-  if (!value || !value.includes("oklch(")) {
+  if (!value || !hasUnsupportedCaptureColor(value)) {
     return value;
   }
 
@@ -274,19 +287,32 @@ function sanitizeCaptureValue(property: string, value: string) {
 
   if (property.startsWith("border")) {
     const normalized = normalizeCaptureColor(value);
-    return normalized ?? value.replace(/oklch\([^)]*\)/g, "transparent");
+    return normalized ?? value.replace(UNSUPPORTED_CAPTURE_COLOR_PATTERN, "transparent");
   }
 
-  return value.replace(/oklch\([^)]*\)/g, "transparent");
+  return value.replace(UNSUPPORTED_CAPTURE_COLOR_PATTERN, "transparent");
 }
 
 function sourceBackgroundFromRoot(root: HTMLElement) {
-  const rawBackground =
-    window.getComputedStyle(root).backgroundColor || "#020617";
-  if (!rawBackground.includes("oklch(")) {
-    return rawBackground;
+  let current: HTMLElement | null = root;
+
+  while (current) {
+    const rawBackground =
+      window.getComputedStyle(current).backgroundColor || "transparent";
+    if (
+      rawBackground &&
+      rawBackground !== "transparent" &&
+      rawBackground !== "rgba(0, 0, 0, 0)"
+    ) {
+      if (!hasUnsupportedCaptureColor(rawBackground)) {
+        return rawBackground;
+      }
+      return normalizeCaptureColor(rawBackground) ?? "#020617";
+    }
+    current = current.parentElement;
   }
-  return normalizeCaptureColor(rawBackground) ?? "#020617";
+
+  return "#020617";
 }
 
 function buildCaptureIframe(sourceRoot: HTMLElement) {
@@ -360,10 +386,10 @@ function buildCaptureIframe(sourceRoot: HTMLElement) {
         continue;
       }
 
-      const sanitizedValue = value.includes("oklch(")
+      const sanitizedValue = hasUnsupportedCaptureColor(value)
         ? sanitizeCaptureValue(property, value)
         : value;
-      if (!sanitizedValue || sanitizedValue.includes("oklch(")) {
+      if (!sanitizedValue || hasUnsupportedCaptureColor(sanitizedValue)) {
         continue;
       }
 
@@ -407,8 +433,35 @@ function buildCaptureIframe(sourceRoot: HTMLElement) {
       node.style.transform = "translateY(-20px)";
     });
 
+  replicaRoot
+    .querySelectorAll<HTMLElement>("[data-capture-ignore='true']")
+    .forEach((node) => {
+      node.remove();
+    });
+
   captureDocument.body.appendChild(replicaRoot);
   return { iframe, root: replicaRoot };
+}
+
+async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
+  await new Promise<void>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Unable to encode PNG"));
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      resolve();
+    }, "image/png");
+  });
 }
 
 export default function PackItScreen() {
@@ -446,6 +499,7 @@ export default function PackItScreen() {
     y: 24,
     size: 240,
   });
+  const [captureFlashVisible, setCaptureFlashVisible] = useState(false);
   const [isRecordingDemo, setIsRecordingDemo] = useState(false);
   const [isQuestionDemo, setIsQuestionDemo] = useState(false);
   const [phantomPos, setPhantomPos] = useState<PhantomPos | null>(null);
@@ -457,6 +511,7 @@ export default function PackItScreen() {
   const itemRefs = useRef<Record<number, HTMLButtonElement | null>>({});
   const musicStartedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const captureSceneRef = useRef<HTMLDivElement>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
@@ -477,6 +532,8 @@ export default function PackItScreen() {
     y: number;
     carry: number;
   } | null>(null);
+  const snipDragRef = useRef<SnipDragState | null>(null);
+  const captureFlashTimerRef = useRef<number | null>(null);
   const itemsRef = useRef<PackedItem[]>(items);
 
   const question = round.questions[questionIndex];
@@ -622,6 +679,9 @@ export default function PackItScreen() {
       }
       if (continuousAutopilotStartTimerRef.current !== null) {
         window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      }
+      if (captureFlashTimerRef.current !== null) {
+        window.clearTimeout(captureFlashTimerRef.current);
       }
       keypadAdjustTimersRef.current.forEach((timer) =>
         window.clearTimeout(timer),
@@ -1546,17 +1606,19 @@ export default function PackItScreen() {
     }
   }
 
-  async function handleCapture() {
-    if (!rootRef.current) {
+  async function handleCapture(closeSnipAfterCapture = false) {
+    if (!rootRef.current || !captureSceneRef.current) {
       return;
     }
 
-    const captureFrame = buildCaptureIframe(rootRef.current);
+    triggerCaptureFlash();
+
+    const captureFrame = buildCaptureIframe(captureSceneRef.current);
 
     let canvas: HTMLCanvasElement;
     try {
       canvas = await html2canvas(captureFrame.root, {
-        backgroundColor: sourceBackgroundFromRoot(rootRef.current),
+        backgroundColor: sourceBackgroundFromRoot(captureSceneRef.current),
         scale: window.devicePixelRatio > 1 ? 2 : 1,
         useCORS: true,
       });
@@ -1567,7 +1629,7 @@ export default function PackItScreen() {
     let sourceCanvas = canvas;
     if (snipMode) {
       const outputCanvas = document.createElement("canvas");
-      const rootRect = rootRef.current.getBoundingClientRect();
+      const rootRect = captureSceneRef.current.getBoundingClientRect();
       const scaleX = canvas.width / rootRect.width;
       const scaleY = canvas.height / rootRect.height;
       const sx = snipSelection.x * scaleX;
@@ -1583,46 +1645,146 @@ export default function PackItScreen() {
       sourceCanvas = outputCanvas;
     }
 
-    sourceCanvas.toBlob((blob) => {
-      if (!blob) {
-        return;
-      }
+    await downloadCanvasPng(
+      sourceCanvas,
+      snipMode ? "pack-it-snip.png" : "pack-it-screenshot.png",
+    );
 
-      playCameraShutter();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = snipMode
-        ? "pack-it-snip.png"
-        : "pack-it-screenshot.png";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    });
+    if (closeSnipAfterCapture && snipMode) {
+      closeSnipMode();
+    }
+  }
+
+  function makeDefaultSnipSelection() {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return null;
+    }
+    const size = Math.max(120, Math.min(Math.min(rect.width, rect.height) * 0.42, 280));
+    return {
+      x: (rect.width - size) / 2,
+      y: (rect.height - size) / 2,
+      size,
+    } satisfies SquareSnip;
+  }
+
+  function clampSnipSelection(next: SquareSnip) {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return next;
+    }
+    const maxSize = Math.max(96, Math.min(rect.width, rect.height));
+    const size = Math.max(96, Math.min(next.size, maxSize));
+    return {
+      x: Math.min(Math.max(0, next.x), rect.width - size),
+      y: Math.min(Math.max(0, next.y), rect.height - size),
+      size,
+    };
+  }
+
+  function closeSnipMode() {
+    snipDragRef.current = null;
+    setSnipMode(false);
+  }
+
+  function triggerCaptureFlash() {
+    playCameraShutter();
+    setCaptureFlashVisible(true);
+    if (captureFlashTimerRef.current !== null) {
+      window.clearTimeout(captureFlashTimerRef.current);
+    }
+    captureFlashTimerRef.current = window.setTimeout(() => {
+      setCaptureFlashVisible(false);
+    }, 180);
+  }
+
+  async function handleCaptureSnip() {
+    await handleCapture(true);
   }
 
   function toggleSquareSnip() {
-    setSnipMode((current) => !current);
+    setSnipMode((current) => {
+      const next = !current;
+      if (next && !rootRef.current) {
+        return current;
+      }
+      if (next) {
+        const initial = makeDefaultSnipSelection();
+        if (initial) {
+          setSnipSelection(initial);
+        }
+      } else {
+        snipDragRef.current = null;
+      }
+      return next;
+    });
   }
 
-  function moveSnip(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!snipMode || !rootRef.current) {
+  useEffect(() => {
+    if (!snipMode) {
+      snipDragRef.current = null;
       return;
     }
 
-    const rect = rootRef.current.getBoundingClientRect();
-    const size = snipSelection.size;
-    const x = Math.max(
-      0,
-      Math.min(event.clientX - rect.left - size / 2, rect.width - size),
-    );
-    const y = Math.max(
-      0,
-      Math.min(event.clientY - rect.top - size / 2, rect.height - size),
-    );
-    setSnipSelection((current) => ({ ...current, x, y }));
-  }
+    function onMove(event: PointerEvent) {
+      const drag = snipDragRef.current;
+      if (!drag) {
+        return;
+      }
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (drag.mode === "move") {
+        setSnipSelection(
+          clampSnipSelection({
+            ...drag.initial,
+            x: drag.initial.x + dx,
+            y: drag.initial.y + dy,
+          }),
+        );
+        return;
+      }
+
+      const delta = Math.max(dx, dy);
+      setSnipSelection(
+        clampSnipSelection({
+          ...drag.initial,
+          size: drag.initial.size + delta,
+        }),
+      );
+    }
+
+    function onUp(event: PointerEvent) {
+      if (snipDragRef.current?.pointerId !== event.pointerId) {
+        return;
+      }
+      snipDragRef.current = null;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      closeSnipMode();
+    }
+
+    function onResize() {
+      setSnipSelection((current) => clampSnipSelection(current));
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [snipMode, snipSelection]);
 
   function stopRecording(download = true) {
     if (demoTimerRef.current !== null) {
@@ -2036,134 +2198,138 @@ export default function PackItScreen() {
         unlockedLevel={1}
         questionPanel={questionPanel}
         children={() => (
-          <div
-            ref={rootRef}
-            data-pack-it-capture-root="true"
-            className="h-full w-full overflow-hidden bg-slate-950"
-            onPointerDownCapture={ensureAudioReady}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onClick={moveSnip}
-          >
+        <div
+          ref={rootRef}
+          data-pack-it-capture-root="true"
+          className="h-full w-full overflow-hidden bg-slate-950"
+          onPointerDownCapture={ensureAudioReady}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
             <div className="flex h-full flex-col px-6 pb-3 pt-[3.6rem]">
               <div className="relative flex-1 overflow-hidden bg-transparent">
-                {false ? (
-                  <div
-                    className="pointer-events-none absolute left-1/2 z-[8] -translate-x-1/2"
-                    style={{ top: "-0.75rem" }}
-                  >
-                    <button
-                      type="button"
-                      className="pointer-events-auto rounded-full border-[3px] border-yellow-300 bg-slate-900 px-6 py-2 font-arcade text-[1rem] font-bold text-yellow-200"
-                      style={{
-                        boxShadow:
-                          "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
-                      }}
-                      onClick={animateItemsBackToSource}
-                    >
-                      Now you try it
-                    </button>
-                  </div>
-                ) : null}
                 <div
-                  className="pointer-events-none absolute z-[1] w-[2px] bg-white"
-                  style={{
-                    left: "46.25%",
-                    top: "0",
-                    height: "99%",
-                    opacity: 0.2,
-                  }}
-                />
-                <div
-                  className="pointer-events-none absolute left-0 right-0 z-[1] h-[2px] bg-white"
-                  style={{ top: "91%", opacity: 0.2 }}
-                />
-                <div
-                  className="pointer-events-none absolute left-0 right-0 z-[2]"
-                  style={{ top: "calc(94.25% - 4px)" }}
+                  ref={captureSceneRef}
+                  className="absolute inset-0 bg-slate-950"
+                  data-pack-it-capture-root="true"
                 >
-                  <div className="grid grid-cols-2">
-                    <div className="flex justify-center">
-                      <DigitalCount value={remainingItems.length} />
+                  {false ? (
+                    <div
+                      className="pointer-events-none absolute left-1/2 z-[8] -translate-x-1/2"
+                      style={{ top: "-0.75rem" }}
+                    >
+                      <button
+                        type="button"
+                        className="pointer-events-auto rounded-full border-[3px] border-yellow-300 bg-slate-900 px-6 py-2 font-arcade text-[1rem] font-bold text-yellow-200"
+                        style={{
+                          boxShadow:
+                            "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
+                        }}
+                        onClick={animateItemsBackToSource}
+                      >
+                        Now you try it
+                      </button>
                     </div>
-                    <div className="flex justify-center">
-                      <DigitalCount value={packedItemsTotal} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative z-[3] grid h-full grid-cols-[45.5%_calc(54.5%-2rem)] gap-8 px-0 pb-3 pt-7">
+                  ) : null}
                   <div
-                    ref={sourceAreaRef}
-                    className="relative h-full bg-transparent pl-4 pr-5 pt-4"
+                    className="pointer-events-none absolute z-[1] w-[2px] bg-white"
                     style={{
-                      boxShadow: hoveredSourceArea
-                        ? "inset 0 0 0 2px rgba(250,204,21,0.45), 0 0 18px rgba(250,204,21,0.18)"
-                        : "none",
+                      left: "46.25%",
+                      top: "0",
+                      height: "99%",
+                      opacity: 0.2,
                     }}
+                  />
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 z-[1] h-[2px] bg-white"
+                    style={{ top: "91%", opacity: 0.2 }}
+                  />
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 z-[2]"
+                    style={{ top: "calc(94.25% - 4px)" }}
                   >
-                    <div className="flex min-h-[7rem] flex-wrap content-start justify-start gap-4">
-                      {items
-                        .slice()
-                        .sort((a, b) => a.id - b.id)
-                        .map((item) =>
-                          item.containerIndex === null ? (
-                            <button
-                              key={item.id}
-                              ref={(node) => {
-                                itemRefs.current[item.id] = node;
-                              }}
-                              type="button"
-                              aria-label={`${question.pair.item} ${item.id + 1}`}
-                              onPointerDown={(event) =>
-                                handlePointerDown(item.id, event)
-                              }
-                              className="relative flex h-16 w-16 items-center justify-center rounded-full border-0 bg-transparent text-[3.1rem] outline-none transition-transform active:scale-95 focus:outline-none"
-                              style={{
-                                appearance: "none",
-                                WebkitAppearance: "none",
-                                boxShadow: "none",
-                                opacity:
-                                  (dragState?.isLifted &&
-                                    draggedItemIds.has(item.id)) ||
-                                  returningItemIds.has(item.id)
-                                    ? 0
-                                    : 1,
-                                pointerEvents:
-                                  revealCtaMode === "retry" || isQuestionDemo
-                                    ? "none"
-                                    : "auto",
-                              }}
-                            >
-                              {selectedItemIdSet.has(item.id) &&
-                              !dragState?.isLifted ? (
-                                <span
-                                  className="pointer-events-none absolute inset-0 rounded-full"
-                                  style={{
-                                    boxShadow:
-                                      "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                                    transform: "translateY(-4px)",
-                                  }}
-                                />
-                              ) : null}
-                              <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
-                                {question.pair.itemEmoji}
-                              </span>
-                            </button>
-                          ) : (
-                            <div
-                              key={item.id}
-                              aria-hidden="true"
-                              className="h-16 w-16 shrink-0"
-                            />
-                          ),
-                        )}
+                    <div className="grid grid-cols-2">
+                      <div className="flex justify-center">
+                        <DigitalCount value={remainingItems.length} />
+                      </div>
+                      <div className="flex justify-center">
+                        <DigitalCount value={packedItemsTotal} />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 content-start pt-1">
-                    {containers.map((containerItems, index) =>
-                      (() => {
+                  <div className="relative z-[3] grid h-full grid-cols-[45.5%_calc(54.5%-2rem)] gap-8 px-0 pb-3 pt-7">
+                    <div
+                      ref={sourceAreaRef}
+                      className="relative h-full bg-transparent pl-4 pr-5 pt-4"
+                      style={{
+                        boxShadow: hoveredSourceArea
+                          ? "inset 0 0 0 2px rgba(250,204,21,0.45), 0 0 18px rgba(250,204,21,0.18)"
+                          : "none",
+                      }}
+                    >
+                      <div className="flex min-h-[7rem] flex-wrap content-start justify-start gap-4">
+                        {items
+                          .slice()
+                          .sort((a, b) => a.id - b.id)
+                          .map((item) =>
+                            item.containerIndex === null ? (
+                              <button
+                                key={item.id}
+                                ref={(node) => {
+                                  itemRefs.current[item.id] = node;
+                                }}
+                                type="button"
+                                aria-label={`${question.pair.item} ${item.id + 1}`}
+                                onPointerDown={(event) =>
+                                  handlePointerDown(item.id, event)
+                                }
+                                className="relative flex h-16 w-16 items-center justify-center rounded-full border-0 bg-transparent text-[3.1rem] outline-none transition-transform active:scale-95 focus:outline-none"
+                                style={{
+                                  appearance: "none",
+                                  WebkitAppearance: "none",
+                                  boxShadow: "none",
+                                  opacity:
+                                    (dragState?.isLifted &&
+                                      draggedItemIds.has(item.id)) ||
+                                    returningItemIds.has(item.id)
+                                      ? 0
+                                      : 1,
+                                  pointerEvents:
+                                    revealCtaMode === "retry" || isQuestionDemo
+                                      ? "none"
+                                      : "auto",
+                                }}
+                              >
+                                {selectedItemIdSet.has(item.id) &&
+                                !dragState?.isLifted ? (
+                                  <span
+                                    className="pointer-events-none absolute inset-0 rounded-full"
+                                    style={{
+                                      boxShadow:
+                                        "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                                      transform: "translateY(-4px)",
+                                    }}
+                                  />
+                                ) : null}
+                                <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                                  {question.pair.itemEmoji}
+                                </span>
+                              </button>
+                            ) : (
+                              <div
+                                key={item.id}
+                                aria-hidden="true"
+                                className="h-16 w-16 shrink-0"
+                              />
+                            ),
+                          )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 content-start pt-1">
+                      {containers.map((containerItems, index) =>
+                        (() => {
                         const isHovered =
                           hoveredContainerIndex === index &&
                           dragState?.origin === "source";
@@ -2342,19 +2508,99 @@ export default function PackItScreen() {
                     </span>
                   </div>
                 ))}
+                </div>
 
                 {snipMode ? (
                   <div
-                    className="pointer-events-none absolute z-[76] rounded-2xl border-4 border-sky-300"
-                    style={{
-                      left: snipSelection.x,
-                      top: snipSelection.y,
-                      width: snipSelection.size,
-                      height: snipSelection.size,
-                      background: "rgba(14, 165, 233, 0.08)",
-                      boxShadow: "0 0 0 9999px rgba(15,23,42,0.22)",
-                    }}
-                  />
+                    className="pointer-events-auto absolute inset-0 z-[82]"
+                    data-capture-ignore="true"
+                  >
+                    <div className="absolute inset-0 bg-black/10" />
+                    <div
+                      className="absolute rounded-2xl"
+                      style={{
+                        left: snipSelection.x,
+                        top: snipSelection.y,
+                        width: snipSelection.size,
+                        height: snipSelection.size,
+                        border: "2px dashed rgba(255,255,255,0.95)",
+                        boxShadow: "0 0 0 9999px rgba(2,6,23,0.22)",
+                        background: "rgba(255,255,255,0.03)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        title="Capture square snip"
+                        onClick={handleCaptureSnip}
+                        className="arcade-button absolute -left-3 -top-3 z-[2] h-10 w-10 p-1.5"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" className="h-full w-full">
+                          <path
+                            d="M7 7h2l1.2-2h3.6L15 7h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <circle cx="12" cy="12.5" r="3.25" stroke="white" strokeWidth="2" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Close square snip"
+                        title="Close square snip"
+                        onClick={closeSnipMode}
+                        className="arcade-button absolute -right-3 -top-3 z-[2] flex h-10 w-10 items-center justify-center p-1.5"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="h-full w-full"
+                          stroke="white"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move square snip"
+                        title="Drag to move"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          snipDragRef.current = {
+                            mode: "move",
+                            pointerId: event.pointerId,
+                            startX: event.clientX,
+                            startY: event.clientY,
+                            initial: snipSelection,
+                          };
+                        }}
+                        className="absolute inset-0 cursor-move rounded-2xl"
+                        style={{ background: "transparent" }}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Resize square snip"
+                        title="Drag to resize"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          snipDragRef.current = {
+                            mode: "resize",
+                            pointerId: event.pointerId,
+                            startX: event.clientX,
+                            startY: event.clientY,
+                            initial: snipSelection,
+                          };
+                        }}
+                        className="absolute -bottom-3 -right-3 z-[2] h-7 w-7 rounded-full border-2 border-white bg-sky-400/90"
+                        style={{ boxShadow: "0 0 18px rgba(56,189,248,0.45)" }}
+                      />
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -2363,6 +2609,16 @@ export default function PackItScreen() {
           </div>
         )}
       />
+      {captureFlashVisible && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-[120]"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(255,255,255,0.94) 0%, rgba(255,255,255,0.7) 22%, rgba(255,255,255,0.18) 52%, rgba(255,255,255,0) 78%)",
+          }}
+        />
+      )}
       {flash?.icon &&
         typeof document !== "undefined" &&
         createPortal(
