@@ -24,7 +24,7 @@ A **bottom steps panel** displays the unitary-method working as it is revealed t
 
 | Context | Interaction |
 |---------|-------------|
-| L1 Load round | Drag individual items into containers |
+| L1 Load round | Drag fixed item combos into containers |
 | L1 Pack / Ship rounds | Tap container to add one item; hold to stream |
 | L2–L3 all rounds | Type answer on keypad → animation plays |
 | L4 all rounds | Type answer on keypad → no animation |
@@ -79,6 +79,8 @@ These should appear using the same character-by-character typewriter/click seque
 Example: "There are 20 cupcakes that have to be packed equally into 5 boxes. How many shall each box have?" → unit = 4 cupcakes per box.
 
 Numbers: groups 2–4, unit 2–6, total ≤24. Whole numbers only.
+
+Load-round drag rule: the child does not pick up just one loose item. Picking one loose item should also select the next two available loose items in source order, skipping over any empty source gaps left by earlier moves. Those buddies should first glow in place, then join the main item when the drag actually lifts. Only the top/right first box is an active drop target; lower boxes are read-only display boxes. When the combo is dropped, all selected items should first land in the top box together, then the extra items should animate downward into the lower boxes so the final equal distribution is shown. Right-side box-to-box redistribution is not allowed. Dragging a placed combo back should only be possible from the top box, and it should bring that remembered combo back to the source side as a group, preserving the source gaps/slots they came from.
 
 ### L2 — Use the unit (one step)
 Two sub-types, randomly mixed:

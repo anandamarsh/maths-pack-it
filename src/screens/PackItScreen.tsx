@@ -24,10 +24,14 @@ import type { PhantomPos } from "../hooks/useAutopilot";
 type PackedItem = {
   id: number;
   containerIndex: number | null;
+  comboId: number | null;
 };
 
 type DragState = {
-  itemId: number;
+  itemIds: number[];
+  origin: "source" | "container";
+  comboId: number | null;
+  isLifted: boolean;
   x: number;
   y: number;
 };
@@ -36,6 +40,7 @@ type ReturnState = {
   itemId: number;
   x: number;
   y: number;
+  durationMs?: number;
 };
 
 type SquareSnip = {
@@ -79,6 +84,7 @@ function buildInitialItems(question: PackQuestion): PackedItem[] {
   return Array.from({ length: question.totalA }, (_, index) => ({
     id: index,
     containerIndex: null,
+    comboId: null,
   }));
 }
 
@@ -226,6 +232,8 @@ export default function PackItScreen() {
   const [isQuestionDemo, setIsQuestionDemo] = useState(false);
   const [phantomPos, setPhantomPos] = useState<PhantomPos | null>(null);
   const [hoveredSourceArea, setHoveredSourceArea] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+  const nextComboIdRef = useRef(1);
   const containerRefs = useRef<Array<HTMLDivElement | null>>([]);
   const sourceAreaRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -254,6 +262,9 @@ export default function PackItScreen() {
   const canSubmit = packedItemsTotal > 0 && revealCtaMode === null && !isQuestionDemo;
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const returningItemIds = new Set(returnStates.map((state) => state.itemId));
+  const draggedItemIds = new Set(dragState?.itemIds ?? []);
+  const selectedItemIdSet = new Set(selectedItemIds);
+  const comboSize = Math.min(3, question.groupsA);
 
   useEffect(() => {
     if (stepTypeIntervalRef.current !== null) {
@@ -455,22 +466,30 @@ export default function PackItScreen() {
     setShowNextQuestionButton(false);
     setRevealCtaMode(null);
     setHoveredSourceArea(false);
+    setSelectedItemIds([]);
     setQuestionResetKey((current) => current + 1);
     dragSoundPointRef.current = null;
+    nextComboIdRef.current = 1;
   }
 
-  function assignItemToContainer(
-    itemId: number,
-    containerIndex: number | null,
+  function assignItems(
+    itemIds: number[],
+    getContainerIndex: (itemId: number, index: number) => number | null,
+    comboId: number | null,
   ) {
     ensureMusic();
-    playRipple(340 + (containerIndex ?? 0) * 45);
+    const firstContainerIndex = getContainerIndex(itemIds[0]!, 0);
+    playRipple(340 + (firstContainerIndex ?? 0) * 45);
     setItems((currentItems) =>
       currentItems.map((item) =>
-        item.id === itemId
+        itemIds.includes(item.id)
           ? {
               ...item,
-              containerIndex,
+              containerIndex: getContainerIndex(
+                item.id,
+                itemIds.indexOf(item.id),
+              ),
+              comboId,
             }
           : item,
       ),
@@ -478,8 +497,87 @@ export default function PackItScreen() {
     setDragState(null);
     setHoveredContainerIndex(null);
     setHoveredSourceArea(false);
+    setSelectedItemIds([]);
     setReturnStates([]);
     dragSoundPointRef.current = null;
+  }
+
+  function stageComboIntoTopBox(
+    itemIds: number[],
+    targetContainerIndexes: number[],
+    comboId: number,
+    startPosition?: { x: number; y: number },
+  ) {
+    assignItems(itemIds, () => 0, comboId);
+
+    const trailingItemIds = itemIds.slice(1);
+    if (trailingItemIds.length === 0) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      const fallbackCenter = getScreenCenter(containerRefs.current[0]);
+      const startX = startPosition?.x ?? (fallbackCenter ? fallbackCenter.x - 32 : 0);
+      const startY = startPosition?.y ?? (fallbackCenter ? fallbackCenter.y - 32 : 0);
+
+      setReturnStates(
+        trailingItemIds.map((itemId, trailingIndex) => ({
+          itemId,
+          x: startX + (trailingIndex + 1) * 72,
+          y: startY,
+          durationMs: 440,
+        })),
+      );
+
+      setItems((currentItems) =>
+        currentItems.map((item) => {
+          const itemIndex = itemIds.indexOf(item.id);
+          return itemIndex >= 1
+            ? {
+                ...item,
+                containerIndex: targetContainerIndexes[itemIndex] ?? 0,
+                comboId,
+              }
+            : item;
+        }),
+      );
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setReturnStates(
+            trailingItemIds
+              .map((itemId) => {
+                const center = getScreenCenter(itemRefs.current[itemId]);
+                return center
+                  ? {
+                      itemId,
+                      x: center.x - 32,
+                      y: center.y - 32,
+                      durationMs: 440,
+                    }
+                  : null;
+              })
+              .filter(
+                (
+                  state,
+                ): state is {
+                  itemId: number;
+                  x: number;
+                  y: number;
+                  durationMs: number;
+                } => state !== null,
+              ),
+          );
+        });
+      });
+
+      if (returnTimerRef.current !== null) {
+        window.clearTimeout(returnTimerRef.current);
+      }
+      returnTimerRef.current = window.setTimeout(() => {
+        setReturnStates([]);
+      }, 480);
+    }, 120);
   }
 
   function handleSubmitAnswer() {
@@ -514,8 +612,53 @@ export default function PackItScreen() {
     ensureMusic();
     setReturnStates([]);
     const rect = event.currentTarget.getBoundingClientRect();
+    const clickedItem = items.find((item) => item.id === itemId);
+    if (!clickedItem) {
+      return;
+    }
+
+    let itemIds: number[] = [];
+    let origin: "source" | "container" = "source";
+    let comboId: number | null = null;
+
+    if (clickedItem.containerIndex === null) {
+      const sourceItems = items
+        .filter((item) => item.containerIndex === null)
+        .sort((left, right) => left.id - right.id);
+      const startIndex = sourceItems.findIndex((item) => item.id === itemId);
+      itemIds = sourceItems
+        .slice(startIndex, startIndex + comboSize)
+        .map((item) => item.id);
+      if (itemIds.length < comboSize) {
+        const needed = comboSize - itemIds.length;
+        itemIds = [
+          ...sourceItems.slice(Math.max(0, startIndex - needed), startIndex).map((item) => item.id),
+          ...itemIds,
+        ];
+      }
+      comboId = nextComboIdRef.current;
+    } else {
+      origin = "container";
+      comboId = clickedItem.comboId;
+      if (comboId === null) {
+        return;
+      }
+      itemIds = items
+        .filter((item) => item.comboId === comboId)
+        .sort((left, right) => left.id - right.id)
+        .map((item) => item.id);
+    }
+
+    if (itemIds.length === 0) {
+      return;
+    }
+
+    setSelectedItemIds(itemIds);
     setDragState({
-      itemId,
+      itemIds,
+      origin,
+      comboId,
+      isLifted: false,
       x: event.clientX - rect.width / 2,
       y: event.clientY - rect.height / 2,
     });
@@ -540,19 +683,18 @@ export default function PackItScreen() {
         event.clientY <= sourceRect.bottom
       : false;
 
-    const hitIndex = containerRefs.current.findIndex((node) => {
-      if (!node) {
-        return false;
-      }
-
-      const rect = node.getBoundingClientRect();
-      return (
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom
-      );
-    });
+    const topContainer = containerRefs.current[0];
+    const hitIndex = topContainer
+      ? (() => {
+          const rect = topContainer.getBoundingClientRect();
+          return event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom
+            ? 0
+            : -1;
+        })()
+      : -1;
 
     setHoveredContainerIndex(hitIndex >= 0 ? hitIndex : null);
     setHoveredSourceArea(isOverSource);
@@ -576,11 +718,21 @@ export default function PackItScreen() {
       };
     }
 
-    setDragState({
-      ...dragState,
-      x: event.clientX - 24,
-      y: event.clientY - 24,
-    });
+    setDragState((current) =>
+      current
+        ? {
+            ...current,
+            isLifted:
+              current.isLifted ||
+              Math.hypot(
+                event.clientX - (current.x + 32),
+                event.clientY - (current.y + 32),
+              ) > 6,
+            x: event.clientX - 24,
+            y: event.clientY - 24,
+          }
+        : current,
+    );
   }
 
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
@@ -596,62 +748,76 @@ export default function PackItScreen() {
         event.clientY <= sourceRect.bottom
       : false;
 
-    const hitIndex = containerRefs.current.findIndex((node) => {
-      if (!node) {
-        return false;
-      }
-
-      const rect = node.getBoundingClientRect();
-      return (
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom
-      );
-    });
+    const topContainer = containerRefs.current[0];
+    const hitIndex = topContainer
+      ? (() => {
+          const rect = topContainer.getBoundingClientRect();
+          return event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom
+            ? 0
+            : -1;
+        })()
+      : -1;
 
     if (hitIndex >= 0) {
-      assignItemToContainer(dragState.itemId, hitIndex);
+      if (dragState.origin === "source") {
+        const comboId = dragState.comboId ?? nextComboIdRef.current;
+        stageComboIntoTopBox(
+          dragState.itemIds,
+          dragState.itemIds.map((_, index) => index),
+          comboId,
+          { x: dragState.x, y: dragState.y },
+        );
+        nextComboIdRef.current = comboId + 1;
+        return;
+      }
+
       return;
     }
 
     if (isOverSource) {
-      assignItemToContainer(dragState.itemId, null);
+      assignItems(dragState.itemIds, () => null, null);
       return;
     }
 
-    const draggedItemId = dragState.itemId;
-    const originNode = itemRefs.current[draggedItemId];
-    const originRect = originNode?.getBoundingClientRect();
-    setReturnStates([
-      {
-        itemId: draggedItemId,
-        x: dragState.x,
+    const originStates = dragState.itemIds
+      .map((itemId, index) => ({
+        itemId,
+        originRect: itemRefs.current[itemId]?.getBoundingClientRect(),
+        x: dragState.x + index * 30,
         y: dragState.y,
-      },
-    ]);
+      }));
+
+    setReturnStates(originStates.map(({ itemId, x, y }) => ({ itemId, x, y })));
     setDragState(null);
     setHoveredContainerIndex(null);
     setHoveredSourceArea(false);
+    setSelectedItemIds([]);
     dragSoundPointRef.current = null;
 
-    if (originRect) {
+    if (originStates.some((state) => state.originRect)) {
       requestAnimationFrame(() => {
-        setReturnStates([
-          {
-            itemId: draggedItemId,
-            x: originRect.left + originRect.width / 2 - 32,
-            y: originRect.top + originRect.height / 2 - 32,
-          },
-        ]);
+        setReturnStates(
+          originStates
+            .map(({ itemId, originRect }) =>
+              originRect
+                ? {
+                    itemId,
+                    x: originRect.left + originRect.width / 2 - 32,
+                    y: originRect.top + originRect.height / 2 - 32,
+                  }
+                : null,
+            )
+            .filter((state): state is ReturnState => state !== null),
+        );
       });
       if (returnTimerRef.current !== null) {
         window.clearTimeout(returnTimerRef.current);
       }
-      window.setTimeout(() => {
-        setReturnStates((current) =>
-          current.filter((state) => state.itemId !== draggedItemId),
-        );
+      returnTimerRef.current = window.setTimeout(() => {
+        setReturnStates([]);
       }, 220);
     } else {
       setReturnStates([]);
@@ -830,38 +996,76 @@ export default function PackItScreen() {
       question.groupsA,
       question.unitRate,
     );
-    const assignments = items
+    const pendingByContainer = Array.from({ length: comboSize }, () => [] as number[]);
+    items
       .filter((item) => targetAssignments.get(item.id) !== item.containerIndex)
-      .map((item) => ({
-        itemId: item.id,
-        containerIndex: targetAssignments.get(item.id) ?? null,
-      }));
+      .forEach((item) => {
+        const containerIndex = targetAssignments.get(item.id);
+        if (
+          containerIndex !== undefined &&
+          containerIndex !== null &&
+          containerIndex < comboSize
+        ) {
+          pendingByContainer[containerIndex]!.push(item.id);
+        }
+      });
 
-    const DEMO_STEP_MS = 480;
-    const DEMO_DROP_DELAY_MS = 240;
+    const comboAssignments = Array.from(
+      { length: Math.max(...pendingByContainer.map((bucket) => bucket.length), 0) },
+      (_, rowIndex) =>
+        pendingByContainer
+          .map((bucket, containerIndex) => {
+            const itemId = bucket[rowIndex];
+            return itemId === undefined
+              ? null
+              : { itemId, containerIndex };
+          })
+          .filter(
+            (
+              entry,
+            ): entry is {
+              itemId: number;
+              containerIndex: number;
+            } => entry !== null,
+          ),
+    ).filter((group) => group.length > 0);
 
-    assignments.forEach((assignment, index) => {
+    const DEMO_STEP_MS = 720;
+    const DEMO_DROP_DELAY_MS = 260;
+
+    comboAssignments.forEach((group, index) => {
       window.setTimeout(() => {
-        const itemCenter = getScreenCenter(itemRefs.current[assignment.itemId]);
+        const orderedGroup = group.slice().sort((left, right) => left.containerIndex - right.containerIndex);
+        const leadItemCenter = getScreenCenter(itemRefs.current[orderedGroup[0]!.itemId]);
+        setSelectedItemIds(orderedGroup.map((entry) => entry.itemId));
+        const comboId = nextComboIdRef.current;
+        nextComboIdRef.current += 1;
+
+        const itemCenter = leadItemCenter;
         if (itemCenter) {
           setPhantomPos({ ...itemCenter, isClicking: false });
         }
 
         window.setTimeout(() => {
-          const targetCenter =
-            assignment.containerIndex === null
-              ? getScreenCenter(sourceAreaRef.current)
-              : getScreenCenter(containerRefs.current[assignment.containerIndex]);
+          const targetCenter = getScreenCenter(containerRefs.current[0]);
           if (targetCenter) {
             setPhantomPos({ ...targetCenter, isClicking: true });
           }
-          assignItemToContainer(assignment.itemId, assignment.containerIndex);
+          stageComboIntoTopBox(
+            orderedGroup.map((entry) => entry.itemId),
+            orderedGroup.map((entry) => entry.containerIndex),
+            comboId,
+            targetCenter
+              ? { x: targetCenter.x - 32, y: targetCenter.y - 32 }
+              : undefined,
+          );
         }, DEMO_DROP_DELAY_MS);
       }, index * DEMO_STEP_MS);
     });
 
     window.setTimeout(
       () => {
+        setSelectedItemIds([]);
         setShowUnitReveal(true);
         setTypedStepLengths([]);
         setShowNextQuestionButton(false);
@@ -869,7 +1073,7 @@ export default function PackItScreen() {
         setPhantomPos(null);
         setIsQuestionDemo(false);
       },
-      assignments.length * DEMO_STEP_MS + 650,
+      comboAssignments.length * DEMO_STEP_MS + 700,
     );
   }
 
@@ -952,6 +1156,7 @@ export default function PackItScreen() {
     setPhantomPos(null);
     setIsQuestionDemo(false);
     setHoveredSourceArea(false);
+    setSelectedItemIds([]);
   }
 
   function handleNowYourTurn() {
@@ -1131,13 +1336,23 @@ export default function PackItScreen() {
                             WebkitAppearance: "none",
                             boxShadow: "none",
                             opacity:
-                              dragState?.itemId === item.id ||
+                              (dragState?.isLifted && draggedItemIds.has(item.id)) ||
                               returningItemIds.has(item.id)
                                 ? 0
                                 : 1,
                             pointerEvents: revealCtaMode === "retry" || isQuestionDemo ? "none" : "auto",
                           }}
                         >
+                          {selectedItemIdSet.has(item.id) && !dragState?.isLifted ? (
+                            <span
+                              className="pointer-events-none absolute inset-0 rounded-full"
+                              style={{
+                                boxShadow:
+                                  "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                                transform: "translateY(-4px)",
+                              }}
+                            />
+                          ) : null}
                           <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
                             {question.pair.itemEmoji}
                           </span>
@@ -1156,7 +1371,10 @@ export default function PackItScreen() {
               <div className="grid grid-cols-1 gap-3 content-start pt-1">
                 {containers.map((containerItems, index) => (
                   (() => {
-                    const isHovered = hoveredContainerIndex === index;
+                    const isHovered =
+                      hoveredContainerIndex === index &&
+                      dragState?.origin === "source";
+                    const isDisabledBox = index !== 0;
                     const isOverfilled = containerItems.length > question.unitRate;
                     const isCorrect = containerItems.length === question.unitRate;
                     const borderColor = isHovered
@@ -1165,22 +1383,30 @@ export default function PackItScreen() {
                         ? "#f87171"
                         : isCorrect
                           ? "#86efac"
-                          : "#475569";
+                          : isDisabledBox
+                            ? "rgba(100,116,139,0.4)"
+                            : "#475569";
                     const counterColor = isOverfilled
                       ? "#f87171"
                       : isCorrect
                         ? "#86efac"
-                        : "#67e8f9";
+                        : isDisabledBox
+                          ? "rgba(103,232,249,0.42)"
+                          : "#67e8f9";
                     const counterGlow = isOverfilled
                       ? "rgba(248,113,113,0.72)"
                       : isCorrect
                         ? "rgba(134,239,172,0.72)"
-                        : "rgba(103,232,249,0.72)";
+                        : isDisabledBox
+                          ? "rgba(103,232,249,0.28)"
+                          : "rgba(103,232,249,0.72)";
                     const counterGlowOuter = isOverfilled
                       ? "rgba(239,68,68,0.26)"
                       : isCorrect
                         ? "rgba(34,197,94,0.26)"
-                        : "rgba(56,189,248,0.26)";
+                        : isDisabledBox
+                          ? "rgba(56,189,248,0.1)"
+                          : "rgba(56,189,248,0.26)";
 
                     return (
                   <div
@@ -1188,11 +1414,16 @@ export default function PackItScreen() {
                     ref={(node) => {
                       containerRefs.current[index] = node;
                     }}
-                    className="relative min-h-[5rem] rounded-[1.35rem] border-[3px] px-4 py-[0.35rem]"
+                    className="relative min-h-[5rem] overflow-hidden rounded-[1.35rem] border-[3px] px-4 py-[0.35rem]"
                     style={{
                       borderColor,
                       background: "transparent",
-                      boxShadow: isHovered ? "0 0 18px rgba(250,204,21,0.3)" : "none",
+                      boxShadow: isHovered
+                        ? "0 0 18px rgba(250,204,21,0.3)"
+                        : isDisabledBox
+                          ? "none"
+                          : "none",
+                      opacity: isDisabledBox ? 0.78 : 1,
                     }}
                   >
                     <div className="pointer-events-none absolute right-4 top-1/2 z-[2] -translate-y-1/2">
@@ -1213,18 +1444,35 @@ export default function PackItScreen() {
                           type="button"
                           aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
                           onPointerDown={(event) =>
-                            handlePointerDown(item.id, event)
+                            index === 0 ? handlePointerDown(item.id, event) : undefined
                           }
-                          className="flex h-16 w-16 items-center justify-center bg-transparent text-[3.1rem]"
+                          className="relative flex h-16 w-16 items-center justify-center bg-transparent text-[3.1rem]"
                           style={{
                             opacity:
-                              dragState?.itemId === item.id ||
+                              (dragState?.isLifted && draggedItemIds.has(item.id)) ||
                               returningItemIds.has(item.id)
                                 ? 0
-                                : 1,
-                            pointerEvents: revealCtaMode === "retry" || isQuestionDemo ? "none" : "auto",
+                                : isDisabledBox
+                                  ? 0.46
+                                  : 1,
+                            pointerEvents:
+                              revealCtaMode === "retry" ||
+                              isQuestionDemo ||
+                              index !== 0
+                                ? "none"
+                                : "auto",
                           }}
                         >
+                          {selectedItemIdSet.has(item.id) && !dragState?.isLifted ? (
+                            <span
+                              className="pointer-events-none absolute inset-0 rounded-full"
+                              style={{
+                                boxShadow:
+                                  "0 0 0 3px rgba(250,204,21,0.82), 0 0 0 8px rgba(250,204,21,0.14), 0 0 14px rgba(250,204,21,0.2)",
+                                transform: "translateY(-4px)",
+                              }}
+                            />
+                          ) : null}
                           {question.pair.itemEmoji}
                         </button>
                       ))}
@@ -1236,26 +1484,33 @@ export default function PackItScreen() {
               </div>
             </div>
 
-            {dragState ? (
+            {dragState?.isLifted ? (
               <div
                 aria-hidden="true"
-                className="pointer-events-none fixed z-[70] flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                className="pointer-events-none fixed z-[70] flex items-center gap-2 rounded-full bg-transparent"
                 style={{
                   left: dragState.x,
                   top: dragState.y,
                 }}
               >
-                <span
-                  className="pointer-events-none absolute inset-0 rounded-full"
-                  style={{
-                    boxShadow:
-                      "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                    transform: "translateY(-4px)",
-                  }}
-                />
-                <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
-                  {question.pair.itemEmoji}
-                </span>
+                {dragState.itemIds.map((itemId) => (
+                  <span
+                    key={`drag-${itemId}`}
+                    className="relative flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                  >
+                    <span
+                      className="pointer-events-none absolute inset-0 rounded-full"
+                      style={{
+                        boxShadow:
+                          "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                        transform: "translateY(-4px)",
+                      }}
+                    />
+                    <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                      {question.pair.itemEmoji}
+                    </span>
+                  </span>
+                ))}
               </div>
             ) : null}
 
@@ -1267,7 +1522,7 @@ export default function PackItScreen() {
                 style={{
                   left: returnState.x,
                   top: returnState.y,
-                  transition: "left 220ms ease-out, top 220ms ease-out",
+                  transition: `left ${returnState.durationMs ?? 220}ms ease-out, top ${returnState.durationMs ?? 220}ms ease-out`,
                 }}
               >
                 <span
