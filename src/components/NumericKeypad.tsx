@@ -75,7 +75,7 @@ export default function NumericKeypad({
   const display = value === "" ? "0" : value;
   const rows = [["7", "8", "9", "⌫"], ["4", "5", "6", "±"], ["1", "2", "3", "."]];
   const buttonHeightClass = isMobileLandscape ? "h-[56px]" : isCoarsePointer ? "h-[45px]" : "h-[55px] md:h-10";
-  const base = `rounded flex items-center justify-center font-black select-none transition-transform active:scale-95 ${isMobileLandscape ? "text-[1.6875rem]" : "text-[1.5rem] md:text-[1.3125rem]"} ${buttonHeightClass}`;
+  const base = `rounded flex cursor-pointer items-center justify-center font-black select-none transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${isMobileLandscape ? "text-[1.6875rem]" : "text-[1.5rem] md:text-[1.3125rem]"} ${buttonHeightClass}`;
   const digit = `${base} ${isMobileLandscape ? "text-[1.875rem]" : "text-[1.7rem] md:text-[1.5rem]"} border`;
   const op = `${base} border`;
   const pressedKeyStyle: React.CSSProperties = {
@@ -224,7 +224,7 @@ export default function NumericKeypad({
           </button>
           <button type="button" onClick={onSubmit} disabled={!canSubmit}
             data-autopilot-key="submit"
-            className={`${base} flex-[2] arcade-button disabled:opacity-40 disabled:cursor-not-allowed`}>
+            className={`${base} flex-[2] arcade-button disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100`}>
             <svg viewBox="0 0 24 24" fill="none"
               className={isMobileLandscape ? "w-[1.6875rem] h-[1.6875rem]" : "w-8 h-8 md:w-7 md:h-7"}
               strokeLinecap="round" strokeLinejoin="round">

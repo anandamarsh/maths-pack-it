@@ -45,10 +45,10 @@ describe("Pack It calculations", () => {
 
     for (const question of round.questions) {
       assert.equal(question.subtype, "find-unit");
-      assert.ok(question.groupsA >= 2 && question.groupsA <= 4);
-      assert.ok(question.unitRate >= 2 && question.unitRate <= 6);
+      assert.ok(question.groupsA >= 2 && question.groupsA <= 5);
+      assert.ok(question.unitRate >= 2 && question.unitRate <= 8);
       assert.equal(question.totalA, question.groupsA * question.unitRate);
-      assert.ok(question.totalA <= 24);
+      assert.ok(question.totalA <= 40);
     }
   });
 

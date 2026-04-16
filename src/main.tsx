@@ -4,10 +4,7 @@ import './index.css'
 import App from './App'
 
 function shouldBlockTouchMenus() {
-  if (typeof window === 'undefined') return true
-  if (import.meta.env.PROD) return true
-  const host = window.location.hostname
-  return host !== 'localhost' && host !== '127.0.0.1' && host !== '::1'
+  return import.meta.env.PROD
 }
 
 function installLongPressMenuBlock() {
@@ -31,6 +28,24 @@ function installLongPressMenuBlock() {
 
   document.addEventListener(
     'contextmenu',
+    (event) => {
+      if (isEditable(event.target)) return
+      event.preventDefault()
+    },
+    { capture: true },
+  )
+
+  document.addEventListener(
+    'selectstart',
+    (event) => {
+      if (isEditable(event.target)) return
+      event.preventDefault()
+    },
+    { capture: true },
+  )
+
+  document.addEventListener(
+    'dragstart',
     (event) => {
       if (isEditable(event.target)) return
       event.preventDefault()

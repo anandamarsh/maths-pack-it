@@ -145,8 +145,8 @@ export function createLevelOneLoadQuestion(
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
   const pair = pickPair(usedPairs, random);
-  const groups = randInt(2, 4, random);
-  const unit = randInt(2, 6, random);
+  const groups = randInt(2, 5, random);
+  const unit = randInt(2, 8, random);
   const total = groups * unit;
   const templateIndex = pickQuestionTemplateIndex(previousTemplateIndex, random);
   const questionText = LEVEL_ONE_LOAD_QUESTION_TEMPLATES[templateIndex](

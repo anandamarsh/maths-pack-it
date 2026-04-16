@@ -13,6 +13,7 @@ import {
   playCameraShutter,
   playCorrect,
   playDragStep,
+  playKeyClick,
   playLevelComplete,
   playTypewriterTick,
   playRipple,
@@ -113,6 +114,15 @@ function getAnchoredGroupItemIds(anchorItemId: number, itemIds: number[]) {
   return [anchorItemId, ...itemIds.filter((itemId) => itemId !== anchorItemId)];
 }
 
+function sortContainerItems(left: PackedItem, right: PackedItem) {
+  const leftCombo = left.comboId ?? -1;
+  const rightCombo = right.comboId ?? -1;
+  if (leftCombo !== rightCombo) {
+    return leftCombo - rightCombo;
+  }
+  return left.id - right.id;
+}
+
 function buildRobotTargetAssignments(
   items: PackedItem[],
   groupsA: number,
@@ -171,6 +181,10 @@ function isHighlightedToken(token: string): boolean {
 function isMathSymbolToken(token: string): boolean {
   return token.includes("=") || token.includes("∴") || token.includes("÷");
 }
+
+const QUESTION_KEYWORD_COLOR = "#facc15";
+const QUESTION_SYMBOL_COLOR = "#66ff66";
+const RETURN_ANIMATION_MS = 220;
 
 function renderHighlightedQuestion(
   text: string,
@@ -818,20 +832,20 @@ function getChromeTheme(item: string, palette: string) {
             "0 0 26px rgba(127,29,29,0.24), inset 0 0 18px rgba(69,10,10,0.32)",
         },
         calculatorBannerStyle: {
-          background: "rgba(54,28,22,0.92)",
+          background: "rgba(24,11,12,0.94)",
           borderColor: "rgba(248,113,113,0.9)",
           color: "#fca5a5",
           boxShadow:
             "0 0 18px rgba(248,113,113,0.16), inset 0 0 16px rgba(127,29,29,0.24)",
         },
         keypadTheme: {
-          panelBackground: "rgba(18,10,12,0.97)",
+          panelBackground: "rgba(15,8,10,0.97)",
           panelBorder: "rgba(248,113,113,0.44)",
           panelGlow:
             "0 0 18px rgba(248,113,113,0.14), inset 0 0 12px rgba(0,0,0,0.42)",
-          digitBackground: "rgba(54,28,22,0.92)",
+          digitBackground: "rgba(29,14,15,0.94)",
           digitBorder: "rgba(248,113,113,0.42)",
-          operatorBackground: "rgba(75,35,28,0.92)",
+          operatorBackground: "rgba(35,17,18,0.94)",
           operatorBorder: "rgba(248,113,113,0.52)",
           displayBorder: "rgba(248,113,113,0.26)",
           displayColor: "#67e8f9",
@@ -861,20 +875,20 @@ function getChromeTheme(item: string, palette: string) {
             "0 0 26px rgba(8,145,178,0.16), inset 0 0 18px rgba(8,47,73,0.34)",
         },
         calculatorBannerStyle: {
-          background: "rgba(10,33,38,0.92)",
+          background: "rgba(7,20,25,0.94)",
           borderColor: "rgba(45,212,191,0.82)",
           color: "#99f6e4",
           boxShadow:
             "0 0 18px rgba(45,212,191,0.14), inset 0 0 16px rgba(15,118,110,0.2)",
         },
         keypadTheme: {
-          panelBackground: "rgba(5,18,24,0.97)",
+          panelBackground: "rgba(4,14,19,0.97)",
           panelBorder: "rgba(45,212,191,0.4)",
           panelGlow:
             "0 0 18px rgba(45,212,191,0.12), inset 0 0 12px rgba(0,0,0,0.42)",
-          digitBackground: "rgba(10,33,38,0.92)",
+          digitBackground: "rgba(7,24,29,0.94)",
           digitBorder: "rgba(45,212,191,0.36)",
-          operatorBackground: "rgba(12,46,50,0.92)",
+          operatorBackground: "rgba(9,29,33,0.94)",
           operatorBorder: "rgba(45,212,191,0.48)",
           displayBorder: "rgba(45,212,191,0.22)",
           displayColor: "#67e8f9",
@@ -904,20 +918,20 @@ function getChromeTheme(item: string, palette: string) {
             "0 0 26px rgba(146,64,14,0.18), inset 0 0 18px rgba(67,20,7,0.34)",
         },
         calculatorBannerStyle: {
-          background: "rgba(53,31,18,0.92)",
+          background: "rgba(22,13,10,0.94)",
           borderColor: "rgba(251,146,60,0.82)",
           color: "#fdba74",
           boxShadow:
             "0 0 18px rgba(251,146,60,0.14), inset 0 0 16px rgba(120,53,15,0.22)",
         },
         keypadTheme: {
-          panelBackground: "rgba(24,14,10,0.97)",
+          panelBackground: "rgba(19,11,8,0.97)",
           panelBorder: "rgba(251,146,60,0.4)",
           panelGlow:
             "0 0 18px rgba(251,146,60,0.12), inset 0 0 12px rgba(0,0,0,0.42)",
-          digitBackground: "rgba(53,31,18,0.92)",
+          digitBackground: "rgba(28,17,12,0.94)",
           digitBorder: "rgba(251,146,60,0.38)",
-          operatorBackground: "rgba(72,41,20,0.92)",
+          operatorBackground: "rgba(34,20,14,0.94)",
           operatorBorder: "rgba(251,146,60,0.48)",
           displayBorder: "rgba(251,146,60,0.22)",
           displayColor: "#67e8f9",
@@ -947,20 +961,20 @@ function getChromeTheme(item: string, palette: string) {
             "0 0 26px rgba(190,24,93,0.16), inset 0 0 18px rgba(80,7,36,0.34)",
         },
         calculatorBannerStyle: {
-          background: "rgba(54,24,44,0.92)",
+          background: "rgba(22,10,24,0.94)",
           borderColor: "rgba(244,114,182,0.8)",
           color: "#f9a8d4",
           boxShadow:
             "0 0 18px rgba(244,114,182,0.12), inset 0 0 16px rgba(157,23,77,0.2)",
         },
         keypadTheme: {
-          panelBackground: "rgba(24,10,24,0.97)",
+          panelBackground: "rgba(18,8,19,0.97)",
           panelBorder: "rgba(244,114,182,0.38)",
           panelGlow:
             "0 0 18px rgba(244,114,182,0.12), inset 0 0 12px rgba(0,0,0,0.42)",
-          digitBackground: "rgba(54,24,44,0.92)",
+          digitBackground: "rgba(28,13,28,0.94)",
           digitBorder: "rgba(244,114,182,0.36)",
-          operatorBackground: "rgba(74,29,57,0.92)",
+          operatorBackground: "rgba(34,16,33,0.94)",
           operatorBorder: "rgba(244,114,182,0.46)",
           displayBorder: "rgba(244,114,182,0.22)",
           displayColor: "#67e8f9",
@@ -990,20 +1004,20 @@ function getChromeTheme(item: string, palette: string) {
             "0 0 26px rgba(76,29,149,0.18), inset 0 0 18px rgba(30,41,59,0.34)",
         },
         calculatorBannerStyle: {
-          background: "rgba(24,33,46,0.92)",
+          background: "rgba(12,17,30,0.94)",
           borderColor: "rgba(45,212,191,0.8)",
           color: "#99f6e4",
           boxShadow:
             "0 0 18px rgba(45,212,191,0.14), inset 0 0 16px rgba(13,148,136,0.18)",
         },
         keypadTheme: {
-          panelBackground: "rgba(13,17,28,0.97)",
+          panelBackground: "rgba(10,14,24,0.97)",
           panelBorder: "rgba(45,212,191,0.38)",
           panelGlow:
             "0 0 18px rgba(45,212,191,0.12), inset 0 0 12px rgba(0,0,0,0.42)",
-          digitBackground: "rgba(24,33,46,0.92)",
+          digitBackground: "rgba(16,22,36,0.94)",
           digitBorder: "rgba(45,212,191,0.34)",
-          operatorBackground: "rgba(30,46,58,0.92)",
+          operatorBackground: "rgba(18,27,41,0.94)",
           operatorBorder: "rgba(45,212,191,0.46)",
           displayBorder: "rgba(45,212,191,0.22)",
           displayColor: "#67e8f9",
@@ -1031,7 +1045,7 @@ function getChromeTheme(item: string, palette: string) {
           borderColor: `${palette}88`,
         },
         calculatorBannerStyle: {
-          background: "rgba(30,41,59,0.92)",
+          background: "rgba(10,15,28,0.94)",
           borderColor: `${palette}cc`,
           color: "#e2e8f0",
         },
@@ -1040,9 +1054,9 @@ function getChromeTheme(item: string, palette: string) {
           panelBorder: `${palette}66`,
           panelGlow:
             "0 0 18px rgba(56,189,248,0.12), inset 0 0 12px rgba(0,0,0,0.4)",
-          digitBackground: "rgba(30,41,59,0.92)",
+          digitBackground: "rgba(11,18,32,0.94)",
           digitBorder: `${palette}55`,
-          operatorBackground: "rgba(51,65,85,0.92)",
+          operatorBackground: "rgba(14,22,38,0.94)",
           operatorBorder: `${palette}77`,
           displayBorder: `${palette}44`,
           displayColor: "#67e8f9",
@@ -1381,6 +1395,7 @@ export default function PackItScreen() {
   const displaySyncLockRef = useRef<number | null>(null);
   const keypadDebounceRef = useRef<number | null>(null);
   const keypadAdjustTimersRef = useRef<number[]>([]);
+  const autopilotSfxTimersRef = useRef<number[]>([]);
   const autopilotAdvanceTimerRef = useRef<number | null>(null);
   const continuousAutopilotStartTimerRef = useRef<number | null>(null);
   const cheatBufferRef = useRef("");
@@ -1396,12 +1411,13 @@ export default function PackItScreen() {
 
   const question = round.questions[questionIndex];
   const containers = Array.from({ length: question.groupsA }, (_, index) =>
-    items.filter((item) => item.containerIndex === index),
+    items
+      .filter((item) => item.containerIndex === index)
+      .sort(sortContainerItems),
   );
   const remainingItems = items.filter((item) => item.containerIndex === null);
   const packedItemsTotal = items.length - remainingItems.length;
-  const canSubmit =
-    packedItemsTotal > 0 && revealCtaMode === null && !isQuestionDemo;
+  const canSubmit = packedItemsTotal > 0 && revealCtaMode === null;
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const returningItemIds = new Set(returnStates.map((state) => state.itemId));
   const draggedItemIds = new Set(dragState?.itemIds ?? []);
@@ -1473,41 +1489,8 @@ export default function PackItScreen() {
     }
 
     const steps = question.blackboardSteps;
-    setTypedStepLengths(Array.from({ length: steps.length }, () => 0));
-    setShowNextQuestionButton(false);
-
-    let lineIndex = 0;
-    let charIndex = 0;
-
-    const startTypingLine = () => {
-      const line = steps[lineIndex] ?? "";
-      stepTypeIntervalRef.current = window.setInterval(() => {
-        charIndex += 1;
-        setTypedStepLengths((current) => {
-          const next = [...current];
-          next[lineIndex] = charIndex;
-          return next;
-        });
-        if (line[charIndex - 1]?.trim()) {
-          playTypewriterTick();
-        }
-        if (charIndex >= line.length && stepTypeIntervalRef.current !== null) {
-          window.clearInterval(stepTypeIntervalRef.current);
-          stepTypeIntervalRef.current = null;
-          if (lineIndex >= steps.length - 1) {
-            stepTypeDelayRef.current = window.setTimeout(() => {
-              setShowNextQuestionButton(true);
-            }, 1000);
-            return;
-          }
-          lineIndex += 1;
-          charIndex = 0;
-          stepTypeDelayRef.current = window.setTimeout(startTypingLine, 1000);
-        }
-      }, 22);
-    };
-
-    startTypingLine();
+    setTypedStepLengths(steps.map((line) => line.length));
+    setShowNextQuestionButton(true);
 
     return () => {
       if (stepTypeIntervalRef.current !== null) {
@@ -1652,6 +1635,103 @@ export default function PackItScreen() {
     );
   }
 
+  function finalizeQuestionReset() {
+    if (returnTimerRef.current !== null) {
+      window.clearTimeout(returnTimerRef.current);
+      returnTimerRef.current = null;
+    }
+    if (stepTypeIntervalRef.current !== null) {
+      window.clearInterval(stepTypeIntervalRef.current);
+      stepTypeIntervalRef.current = null;
+    }
+    if (stepTypeDelayRef.current !== null) {
+      window.clearTimeout(stepTypeDelayRef.current);
+      stepTypeDelayRef.current = null;
+    }
+    setItems(buildInitialItems(question));
+    setShowUnitReveal(false);
+    setQuestionSolved(false);
+    setDragState(null);
+    setHoveredContainerIndex(null);
+    setReturnStates([]);
+    setPhantomPos(null);
+    setPhantomDragState(null);
+    setGroupingAnchorItemId(null);
+    setIsGroupingPreviewAnimating(false);
+    setIsQuestionDemo(false);
+    setFlash(null);
+    setTypedStepLengths([]);
+    setShowNextQuestionButton(false);
+    setRevealCtaMode(null);
+    setHoveredSourceArea(false);
+    setSelectedItemIds([]);
+    setGroupingAnchorItemId(null);
+    setIsGroupingPreviewAnimating(false);
+    setDisplayTopBoxCount(0);
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+    setForceAnswerBanner(false);
+    setIsCalculatorAdjusting(false);
+    setIsContinuousAutopilot(false);
+    dragSoundPointRef.current = null;
+    nextComboIdRef.current = 1;
+    if (displaySyncLockRef.current !== null) {
+      window.clearTimeout(displaySyncLockRef.current);
+      displaySyncLockRef.current = null;
+    }
+    if (keypadDebounceRef.current !== null) {
+      window.clearTimeout(keypadDebounceRef.current);
+      keypadDebounceRef.current = null;
+    }
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+      autopilotAdvanceTimerRef.current = null;
+    }
+    if (continuousAutopilotStartTimerRef.current !== null) {
+      window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      continuousAutopilotStartTimerRef.current = null;
+    }
+    clearAutopilotSfxTimers();
+    keypadAdjustTimersRef.current.forEach((timer) =>
+      window.clearTimeout(timer),
+    );
+    keypadAdjustTimersRef.current = [];
+  }
+
+  function handleToolbarRefresh() {
+    if (demoTimerRef.current !== null) {
+      window.clearTimeout(demoTimerRef.current);
+      demoTimerRef.current = null;
+    }
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+      autopilotAdvanceTimerRef.current = null;
+    }
+    if (continuousAutopilotStartTimerRef.current !== null) {
+      window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      continuousAutopilotStartTimerRef.current = null;
+    }
+    clearAutopilotSfxTimers();
+    setIsContinuousAutopilot(false);
+    setPhantomPos(null);
+    setPhantomDragState(null);
+    setDragState(null);
+    setFlash(null);
+
+    const hasPackedItems = itemsRef.current.some(
+      (item) => item.containerIndex !== null,
+    );
+
+    if (hasPackedItems) {
+      animateItemsBackToSource(() => {
+        finalizeQuestionReset();
+      });
+      return;
+    }
+
+    finalizeQuestionReset();
+  }
+
   function handleRestart() {
     if (demoTimerRef.current !== null) {
       window.clearTimeout(demoTimerRef.current);
@@ -1721,6 +1801,7 @@ export default function PackItScreen() {
       window.clearTimeout(continuousAutopilotStartTimerRef.current);
       continuousAutopilotStartTimerRef.current = null;
     }
+    clearAutopilotSfxTimers();
     keypadAdjustTimersRef.current.forEach((timer) =>
       window.clearTimeout(timer),
     );
@@ -1783,6 +1864,25 @@ export default function PackItScreen() {
     keypadAdjustTimersRef.current = [];
   }
 
+  function clearAutopilotSfxTimers() {
+    autopilotSfxTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    autopilotSfxTimersRef.current = [];
+  }
+
+  function scheduleAutopilotDragSounds(durationMs: number, intervalMs = 180) {
+    clearAutopilotSfxTimers();
+    const stepCount = Math.max(1, Math.floor(durationMs / intervalMs));
+    for (let index = 0; index < stepCount; index += 1) {
+      const timer = window.setTimeout(() => {
+        autopilotSfxTimersRef.current = autopilotSfxTimersRef.current.filter(
+          (current) => current !== timer,
+        );
+        playDragStep();
+      }, index * intervalMs);
+      autopilotSfxTimersRef.current.push(timer);
+    }
+  }
+
   function scheduleAdjustTimer(callback: () => void, delayMs: number) {
     const timer = window.setTimeout(() => {
       keypadAdjustTimersRef.current = keypadAdjustTimersRef.current.filter(
@@ -1796,7 +1896,7 @@ export default function PackItScreen() {
   function getCurrentItemsInContainer(containerIndex: number) {
     return itemsRef.current
       .filter((item) => item.containerIndex === containerIndex)
-      .sort((left, right) => left.id - right.id);
+      .sort(sortContainerItems);
   }
 
   function animateItemsToSource(itemIds: number[]) {
@@ -2070,10 +2170,13 @@ export default function PackItScreen() {
     comboId: number,
     startPosition?: { x: number; y: number },
   ) {
+    const COLUMN_DROP_DELAY_MS = 80;
+    const COLUMN_DROP_TRAVEL_MS = 320;
+    const COLUMN_DROP_CLEANUP_MS = 360;
     const finalTopBoxCount = targetContainerIndexes.filter(
       (containerIndex) => containerIndex === 0,
     ).length;
-    lockDisplayTopBoxCount(finalTopBoxCount, 600);
+    lockDisplayTopBoxCount(finalTopBoxCount, COLUMN_DROP_DELAY_MS + COLUMN_DROP_TRAVEL_MS);
     assignItems(itemIds, () => 0, comboId);
 
     const trailingItemIds = itemIds.slice(1);
@@ -2093,7 +2196,7 @@ export default function PackItScreen() {
           itemId,
           x: startX + (trailingIndex + 1) * 72,
           y: startY,
-          durationMs: 440,
+          durationMs: COLUMN_DROP_TRAVEL_MS,
         })),
       );
 
@@ -2121,7 +2224,7 @@ export default function PackItScreen() {
                       itemId,
                       x: center.x - 32,
                       y: center.y - 32,
-                      durationMs: 440,
+                      durationMs: COLUMN_DROP_TRAVEL_MS,
                     }
                   : null;
               })
@@ -2144,8 +2247,8 @@ export default function PackItScreen() {
       }
       returnTimerRef.current = window.setTimeout(() => {
         setReturnStates([]);
-      }, 480);
-    }, 120);
+      }, COLUMN_DROP_CLEANUP_MS);
+    }, COLUMN_DROP_DELAY_MS);
   }
 
   function getTopBoxLeadDropPosition(): { x: number; y: number } | null {
@@ -2158,7 +2261,12 @@ export default function PackItScreen() {
 
     if (lastTopItemRect) {
       return {
-        x: lastTopItemRect.left + lastTopItemRect.width + 8 - 32 + DROP_TARGET_OFFSET_X,
+        x:
+          lastTopItemRect.left +
+          lastTopItemRect.width +
+          8 -
+          32 +
+          DROP_TARGET_OFFSET_X,
         y: lastTopItemRect.top + lastTopItemRect.height / 2 - 32,
       };
     }
@@ -2179,7 +2287,8 @@ export default function PackItScreen() {
       return null;
     }
 
-    const anchorRect = itemRefs.current[groupingAnchorItemId]?.getBoundingClientRect();
+    const anchorRect =
+      itemRefs.current[groupingAnchorItemId]?.getBoundingClientRect();
     if (!anchorRect) {
       return null;
     }
@@ -2187,7 +2296,10 @@ export default function PackItScreen() {
     return {
       left: anchorRect.left - 8,
       top: anchorRect.top + 4,
-      width: selectedItemIds.length * 64 + Math.max(0, selectedItemIds.length - 1) * 8 + 16,
+      width:
+        selectedItemIds.length * 64 +
+        Math.max(0, selectedItemIds.length - 1) * 8 +
+        16,
       height: 56,
     };
   }
@@ -2197,13 +2309,17 @@ export default function PackItScreen() {
       return undefined;
     }
 
-    const anchorRect = itemRefs.current[groupingAnchorItemId]?.getBoundingClientRect();
+    const anchorRect =
+      itemRefs.current[groupingAnchorItemId]?.getBoundingClientRect();
     const itemRect = itemRefs.current[itemId]?.getBoundingClientRect();
     if (!anchorRect || !itemRect) {
       return undefined;
     }
 
-    const orderedIds = getAnchoredGroupItemIds(groupingAnchorItemId, selectedItemIds);
+    const orderedIds = getAnchoredGroupItemIds(
+      groupingAnchorItemId,
+      selectedItemIds,
+    );
     const targetIndex = orderedIds.indexOf(itemId);
     if (targetIndex < 0) {
       return undefined;
@@ -2289,7 +2405,12 @@ export default function PackItScreen() {
     const DEMO_DRAG_START_DELAY_MS = 120;
     const DEMO_DRAG_TRAVEL_MS = 920;
     const DEMO_DROP_HOLD_MS = 300;
-    const DEMO_SELECTION_CLEAR_MS = 700;
+    const DEMO_FINAL_DROP_SETTLE_MS =
+      DEMO_PICKUP_PRESS_MS +
+      DEMO_DRAG_START_DELAY_MS +
+      DEMO_DRAG_TRAVEL_MS +
+      DEMO_DRAG_TRAVEL_MS +
+      DEMO_DROP_HOLD_MS;
 
     comboAssignments.forEach((group, index) => {
       window.setTimeout(() => {
@@ -2341,6 +2462,7 @@ export default function PackItScreen() {
                 isClicking: false,
                 durationMs: DEMO_DRAG_TRAVEL_MS,
               });
+              scheduleAutopilotDragSounds(DEMO_DRAG_TRAVEL_MS);
               setPhantomDragState({
                 itemIds: orderedGroup.map((entry) => entry.itemId),
                 anchorItemId,
@@ -2366,11 +2488,9 @@ export default function PackItScreen() {
                 );
                 setPhantomPos(null);
                 setPhantomDragState(null);
-                window.setTimeout(() => {
-                  setSelectedItemIds([]);
-                  setGroupingAnchorItemId(null);
-                  setIsGroupingPreviewAnimating(false);
-                }, DEMO_SELECTION_CLEAR_MS);
+                setSelectedItemIds([]);
+                setGroupingAnchorItemId(null);
+                setIsGroupingPreviewAnimating(false);
               }, DEMO_DROP_HOLD_MS);
             }, DEMO_DRAG_TRAVEL_MS);
           }, DEMO_DRAG_TRAVEL_MS);
@@ -2378,24 +2498,56 @@ export default function PackItScreen() {
       }, index * DEMO_STEP_MS);
     });
 
-    window.setTimeout(
-      () => {
-        setSelectedItemIds([]);
-        setShowUnitReveal(true);
-        setTypedStepLengths([]);
-        setShowNextQuestionButton(false);
-        setRevealCtaMode(mode === "retry" ? "retry" : "next");
-        setPhantomPos(null);
-        setPhantomDragState(null);
-        setIsQuestionDemo(false);
-        if (mode === "solve") {
-          setQuestionSolved(true);
-          setFlash({ ok: true, icon: true });
-          playCorrect();
+    window.setTimeout(() => {
+      const submitButtonCenter = getSubmitButtonCenter();
+      if (submitButtonCenter) {
+        setPhantomPos({
+          ...submitButtonCenter,
+          isClicking: false,
+          durationMs: 80,
+        });
+      }
+
+      window.setTimeout(() => {
+        if (submitButtonCenter) {
+          setPhantomPos({
+            ...submitButtonCenter,
+            isClicking: true,
+            durationMs: 120,
+          });
         }
-      },
-      comboAssignments.length * DEMO_STEP_MS + 1250,
-    );
+        playKeyClick();
+
+        window.setTimeout(() => {
+          setSelectedItemIds([]);
+          setTypedStepLengths([]);
+          setShowNextQuestionButton(false);
+          setPhantomPos(null);
+          setPhantomDragState(null);
+          setIsQuestionDemo(false);
+
+          const isCorrect = isCurrentBoardCorrect();
+
+          if (isCorrect) {
+            applyCorrectAnswerResult(mode === "retry" ? "retry" : "next");
+          } else {
+            setShowUnitReveal(false);
+            setQuestionSolved(false);
+            setFlash({ ok: false, icon: true });
+            markQuestionPenalty();
+            playWrong();
+          }
+        }, 180);
+      }, 1000);
+    }, Math.max(0, (comboAssignments.length - 1) * DEMO_STEP_MS + DEMO_FINAL_DROP_SETTLE_MS));
+  }
+
+  function applyCorrectAnswerResult(revealMode: RevealCtaMode) {
+    setShowUnitReveal(true);
+    setQuestionSolved(true);
+    setFlash({ ok: true, icon: true });
+    setRevealCtaMode(revealMode);
+    playCorrect();
   }
 
   function handleSubmitAnswer() {
@@ -2406,11 +2558,7 @@ export default function PackItScreen() {
       );
 
     if (isCorrect) {
-      setShowUnitReveal(true);
-      setQuestionSolved(true);
-      setFlash({ ok: true, icon: true });
-      setRevealCtaMode("next");
-      playCorrect();
+      applyCorrectAnswerResult("next");
       return;
     }
 
@@ -2544,21 +2692,37 @@ export default function PackItScreen() {
       };
     }
 
-    setDragState((current) =>
-      current
-        ? {
+    setDragState((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const isLifted =
+        current.isLifted ||
+        Math.hypot(
+          event.clientX - (current.x + current.pointerOffsetX),
+          event.clientY - (current.y + current.pointerOffsetY),
+        ) > 6;
+
+      if (isLifted && hitIndex === 0) {
+        const snapPosition = getTopBoxLeadDropPosition();
+        if (snapPosition) {
+          return {
             ...current,
-            isLifted:
-              current.isLifted ||
-              Math.hypot(
-                event.clientX - (current.x + current.pointerOffsetX),
-                event.clientY - (current.y + current.pointerOffsetY),
-              ) > 6,
-            x: event.clientX - current.pointerOffsetX,
-            y: event.clientY - current.pointerOffsetY,
-          }
-        : current,
-    );
+            isLifted,
+            x: snapPosition.x,
+            y: snapPosition.y,
+          };
+        }
+      }
+
+      return {
+        ...current,
+        isLifted,
+        x: event.clientX - current.pointerOffsetX,
+        y: event.clientY - current.pointerOffsetY,
+      };
+    });
   }
 
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
@@ -2939,11 +3103,29 @@ export default function PackItScreen() {
     };
   }
 
+  function getSubmitButtonCenter(): { x: number; y: number } | null {
+    const submitButton = document.querySelector<HTMLButtonElement>(
+      '[data-autopilot-key="submit"]',
+    );
+    return getScreenCenter(submitButton ?? null);
+  }
+
+  function isCurrentBoardCorrect() {
+    const currentItems = itemsRef.current;
+    if (currentItems.some((item) => item.containerIndex === null)) {
+      return false;
+    }
+
+    return Array.from({ length: question.groupsA }, (_, containerIndex) =>
+      currentItems.filter((item) => item.containerIndex === containerIndex).length,
+    ).every((count) => count === question.unitRate);
+  }
+
   function solveCurrentQuestion() {
     runQuestionAutopilot("retry");
   }
 
-  function animateItemsBackToSource() {
+  function animateItemsBackToSource(onComplete?: () => void) {
     const packedItems = items.filter((item) => item.containerIndex !== null);
 
     if (packedItems.length === 0) {
@@ -2951,6 +3133,7 @@ export default function PackItScreen() {
       setTypedStepLengths([]);
       setShowNextQuestionButton(false);
       setRevealCtaMode(null);
+      onComplete?.();
       return;
     }
 
@@ -2997,8 +3180,10 @@ export default function PackItScreen() {
       window.clearTimeout(returnTimerRef.current);
     }
     returnTimerRef.current = window.setTimeout(() => {
+      returnTimerRef.current = null;
       setReturnStates([]);
-    }, 220);
+      onComplete?.();
+    }, RETURN_ANIMATION_MS);
   }
 
   function goToNextQuestion() {
@@ -3099,6 +3284,7 @@ export default function PackItScreen() {
       setIsContinuousAutopilot(false);
       setPhantomPos(null);
       setPhantomDragState(null);
+      clearAutopilotSfxTimers();
       return;
     }
 
@@ -3110,28 +3296,30 @@ export default function PackItScreen() {
       if (autopilotAdvanceTimerRef.current !== null) {
         window.clearTimeout(autopilotAdvanceTimerRef.current);
       }
-      const nextButtonCenter = getScreenCenter(nextQuestionButtonRef.current);
-      if (nextButtonCenter) {
-        setPhantomPos({
-          ...nextButtonCenter,
-          isClicking: false,
-          durationMs: 260,
-        });
-      }
       autopilotAdvanceTimerRef.current = window.setTimeout(() => {
         autopilotAdvanceTimerRef.current = null;
+        const nextButtonCenter = getScreenCenter(nextQuestionButtonRef.current);
         if (nextButtonCenter) {
           setPhantomPos({
             ...nextButtonCenter,
-            isClicking: true,
-            durationMs: 120,
+            isClicking: false,
+            durationMs: 220,
           });
         }
         window.setTimeout(() => {
-          setPhantomPos(null);
-          goToNextQuestion();
-        }, 180);
-      }, 320);
+          if (nextButtonCenter) {
+            setPhantomPos({
+              ...nextButtonCenter,
+              isClicking: true,
+              durationMs: 120,
+            });
+          }
+          window.setTimeout(() => {
+            setPhantomPos(null);
+            goToNextQuestion();
+          }, 1000);
+        }, 220);
+      }, 2000);
       return;
     }
 
@@ -3153,6 +3341,42 @@ export default function PackItScreen() {
     revealCtaMode,
     showNextQuestionButton,
   ]);
+
+  useEffect(() => {
+    if (!showNextQuestionButton) {
+      return;
+    }
+
+    function handleNextButtonEnter(event: KeyboardEvent) {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      if (revealCtaMode === "retry") {
+        handleNowYourTurn();
+        return;
+      }
+      if (revealCtaMode === "next") {
+        goToNextQuestion();
+      }
+    }
+
+    window.addEventListener("keydown", handleNextButtonEnter);
+    return () => {
+      window.removeEventListener("keydown", handleNextButtonEnter);
+    };
+  }, [goToNextQuestion, handleNowYourTurn, revealCtaMode, showNextQuestionButton]);
 
   const visibleStepLines = showUnitReveal
     ? question.blackboardSteps
@@ -3209,8 +3433,8 @@ export default function PackItScreen() {
             ) : (
               renderHighlightedQuestion(visibleQuestionText, {
                 normal: messageTheme.text,
-                highlight: messageTheme.highlight,
-                symbol: messageTheme.symbol,
+                highlight: QUESTION_KEYWORD_COLOR,
+                symbol: QUESTION_SYMBOL_COLOR,
               })
             )}
           </div>
@@ -3248,7 +3472,7 @@ export default function PackItScreen() {
                         {renderHighlightedQuestion(line, {
                           normal: messageTheme.text,
                           highlight: messageTheme.highlight,
-                          symbol: messageTheme.symbol,
+                          symbol: QUESTION_SYMBOL_COLOR,
                         })}
                         {isLastVisibleLine &&
                         isFinalLine &&
@@ -3261,11 +3485,11 @@ export default function PackItScreen() {
                                 ? handleNowYourTurn
                                 : goToNextQuestion
                             }
-                            className="ml-4 inline-flex h-[2rem] items-center rounded-full border-[3px] px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle"
+                            className="ml-4 inline-flex h-[2rem] cursor-pointer items-center rounded-full border-[3px] px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
                             style={{
                               borderColor: messageTheme.highlight,
-                              background: messageTheme.symbol,
-                              color: messageTheme.outerBackground,
+                              background: messageTheme.outerBackground,
+                              color: "#f8fafc",
                               boxShadow: `0 0 10px ${messageTheme.highlight}33, 0 0 0 2px ${messageTheme.outerBorder}`,
                             }}
                           >
@@ -3290,7 +3514,7 @@ export default function PackItScreen() {
       <GameLayout
         muted={muted}
         onToggleMute={handleToggleMute}
-        onRestart={handleRestart}
+        onRestart={handleToolbarRefresh}
         keypadValue={
           calculatorOverride ? calculatorInput : String(displayTopBoxCount)
         }
@@ -3303,6 +3527,7 @@ export default function PackItScreen() {
         isRecordingDemo={isRecordingDemo}
         onQuestionDemo={solveCurrentQuestion}
         isQuestionDemo={isQuestionDemo}
+        forceKeypadExpanded={isQuestionDemo}
         onKeypadSubmit={handleSubmitAnswer}
         canSubmit={canSubmit}
         calculatorTopBanner={calculatorTopBanner}
@@ -3355,9 +3580,8 @@ export default function PackItScreen() {
                               groupingAnchorItemId,
                               selectedItemIds,
                             ).map((itemId) => {
-                              const previewItem = getGroupingPreviewItemState(
-                                itemId,
-                              );
+                              const previewItem =
+                                getGroupingPreviewItemState(itemId);
                               return previewItem ? (
                                 <div
                                   key={`grouping-preview-${itemId}`}
@@ -3371,7 +3595,9 @@ export default function PackItScreen() {
                                       "transform 180ms cubic-bezier(0.22,0.72,0.2,1)",
                                   }}
                                 >
-                                  <span style={{ transform: "translateY(4px)" }}>
+                                  <span
+                                    style={{ transform: "translateY(4px)" }}
+                                  >
                                     {question.pair.itemEmoji}
                                   </span>
                                 </div>
@@ -3463,13 +3689,13 @@ export default function PackItScreen() {
                                       ? 61
                                       : undefined,
                                   opacity:
-                                    ((dragState?.isLifted &&
+                                    (dragState?.isLifted &&
                                       draggedItemIds.has(item.id)) ||
-                                      (phantomDragState &&
-                                        selectedItemIdSet.has(item.id)) ||
-                                      (isGroupingPreviewActive &&
-                                        selectedItemIdSet.has(item.id)) ||
-                                      returningItemIds.has(item.id))
+                                    (phantomDragState &&
+                                      selectedItemIdSet.has(item.id)) ||
+                                    (isGroupingPreviewActive &&
+                                      selectedItemIdSet.has(item.id)) ||
+                                    returningItemIds.has(item.id)
                                       ? 0
                                       : 1,
                                   pointerEvents:
@@ -3487,11 +3713,18 @@ export default function PackItScreen() {
                                     style={{
                                       boxShadow:
                                         "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                                      transform: "translateY(-4px)",
+                                      transform: "translateY(0px)",
                                     }}
                                   />
                                 ) : null}
-                                <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                                <span
+                                  className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                                  style={{
+                                    transform: selectedItemIdSet.has(item.id)
+                                      ? "translateY(4px)"
+                                      : undefined,
+                                  }}
+                                >
                                   {question.pair.itemEmoji}
                                 </span>
                               </button>
@@ -3613,13 +3846,17 @@ export default function PackItScreen() {
                                         style={{
                                           boxShadow:
                                             "0 0 0 3px rgba(250,204,21,0.82), 0 0 0 8px rgba(250,204,21,0.14), 0 0 14px rgba(250,204,21,0.2)",
-                                          transform: "translateY(-4px)",
+                                          transform: "translateY(0px)",
                                         }}
                                       />
                                     ) : null}
                                     <span
                                       className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                                      style={{ transform: "translateY(4px)" }}
+                                      style={{
+                                        transform: selectedItemIdSet.has(item.id)
+                                          ? "translateY(8px)"
+                                          : "translateY(4px)",
+                                      }}
                                     >
                                       {question.pair.itemEmoji}
                                     </span>
