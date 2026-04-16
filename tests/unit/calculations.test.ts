@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createRound } from "../../src/calculations/index.ts";
-import { createLevelOneLoadQuestion, createLevelOneLoadRound } from "../../src/calculations/level-1/round-1.ts";
+import {
+  createLevelOneLoadQuestion,
+  createLevelOneLoadRound,
+  createLevelOnePackQuestion,
+  createLevelOnePackRound,
+  createLevelOneShipQuestion,
+  createLevelOneShipRound,
+} from "../../src/calculations/level-1/round-1.ts";
 
 describe("Pack It calculations", () => {
   it("creates a deterministic Level 1 Load question", () => {
@@ -45,11 +52,35 @@ describe("Pack It calculations", () => {
 
     for (const question of round.questions) {
       assert.equal(question.subtype, "find-unit");
-      assert.ok(question.groupsA >= 2 && question.groupsA <= 5);
-      assert.ok(question.unitRate >= 2 && question.unitRate <= 8);
+      assert.ok(question.groupsA >= 2 && question.groupsA <= 4);
+      assert.ok(question.unitRate >= 2 && question.unitRate <= 6);
       assert.equal(question.totalA, question.groupsA * question.unitRate);
-      assert.ok(question.totalA <= 40);
+      assert.ok(question.totalA <= 24);
     }
+  });
+
+  it("creates the other Level 1 rounds with matching round names", () => {
+    const packRound = createLevelOnePackRound(() => 0.25);
+    const shipRound = createLevelOneShipRound(() => 0.25);
+
+    assert.equal(packRound.round, "pack");
+    assert.equal(shipRound.round, "ship");
+    assert.ok(packRound.questions.every((question) => question.round === "pack"));
+    assert.ok(shipRound.questions.every((question) => question.round === "ship"));
+  });
+
+  it("uses larger value ranges for Level 1 Pack and Ship", () => {
+    const packQuestion = createLevelOnePackQuestion([], () => 0.99);
+    const shipQuestion = createLevelOneShipQuestion([], () => 0.99);
+
+    assert.ok(packQuestion.groupsA >= 4 && packQuestion.groupsA <= 5);
+    assert.ok(packQuestion.unitRate <= 8);
+    assert.ok(packQuestion.totalA <= 40);
+    assert.ok(packQuestion.totalA >= 10 && packQuestion.totalA <= 99);
+    assert.ok(shipQuestion.groupsA >= 4 && shipQuestion.groupsA <= 5);
+    assert.ok(shipQuestion.unitRate <= 8);
+    assert.ok(shipQuestion.totalA <= 40);
+    assert.ok(shipQuestion.totalA >= 10 && shipQuestion.totalA <= 99);
   });
 
   it("does not repeat the same Level 1 Load question wording twice in a row", () => {
@@ -78,6 +109,11 @@ describe("Pack It calculations", () => {
     const round = createRound(1, "load", () => 0);
 
     assert.equal(round.questions[0].answer, 2);
+  });
+
+  it("dispatches all implemented Level 1 rounds through the facade", () => {
+    assert.equal(createRound(1, "pack", () => 0).round, "pack");
+    assert.equal(createRound(1, "ship", () => 0).round, "ship");
   });
 
   it("throws for rounds that are not implemented yet", () => {

@@ -1,5 +1,5 @@
 import { pickPair, randInt } from "../shared.ts";
-import type { GroupingPair, PackQuestion, RoundConfig } from "../types.ts";
+import type { GroupingPair, PackQuestion, RoundConfig, RoundName } from "../types.ts";
 
 function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -139,14 +139,32 @@ function pickQuestionTemplateIndex(
   return templateIndex;
 }
 
-export function createLevelOneLoadQuestion(
+function buildLevelOneBlackboardSteps(
+  pair: GroupingPair,
+  total: number,
+  groups: number,
+  unit: number,
+) {
+  return [
+    `Total ${pair.itemPlural} = ${total}.`,
+    `Total ${pair.containerPlural} = ${groups}.`,
+    `∴ ${capitalize(pair.itemPlural)} per ${pair.container} = ${total} ÷ ${groups} = ${unit}.`,
+  ];
+}
+
+export function createLevelOneQuestion(
+  round: RoundName,
   usedPairs: GroupingPair[] = [],
   random: () => number = Math.random,
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
   const pair = pickPair(usedPairs, random);
-  const groups = randInt(2, 5, random);
-  const unit = randInt(2, 8, random);
+  const groups = round === "load"
+    ? randInt(2, 4, random)
+    : randInt(4, 5, random);
+  const unit = round === "load"
+    ? randInt(2, 6, random)
+    : randInt(3, 8, random);
   const total = groups * unit;
   const templateIndex = pickQuestionTemplateIndex(previousTemplateIndex, random);
   const questionText = LEVEL_ONE_LOAD_QUESTION_TEMPLATES[templateIndex](
@@ -157,7 +175,7 @@ export function createLevelOneLoadQuestion(
 
   return {
     level: 1,
-    round: "load",
+    round,
     subtype: "find-unit",
     pair,
     totalA: total,
@@ -166,20 +184,20 @@ export function createLevelOneLoadQuestion(
     answer: unit,
     answerUnit: `${pair.itemPlural} per ${pair.container}`,
     questionText,
-    blackboardSteps: [
-      `Total ${pair.itemPlural} = ${total}.`,
-      `Total ${pair.containerPlural} = ${groups}.`,
-      `∴ ${capitalize(pair.itemPlural)} per ${pair.container} = ${total} ÷ ${groups} = ${unit}.`,
-    ],
+    blackboardSteps: buildLevelOneBlackboardSteps(pair, total, groups, unit),
     isFraction: false,
   };
 }
 
-export function createLevelOneLoadRound(random: () => number = Math.random): RoundConfig {
+function createLevelOneRound(
+  round: RoundName,
+  random: () => number = Math.random,
+): RoundConfig {
   const usedPairs: GroupingPair[] = [];
   let previousTemplateIndex: number | null = null;
   const questions = Array.from({ length: 10 }, () => {
-    const question = createLevelOneLoadQuestion(
+    const question = createLevelOneQuestion(
+      round,
       usedPairs,
       random,
       previousTemplateIndex,
@@ -195,7 +213,43 @@ export function createLevelOneLoadRound(random: () => number = Math.random): Rou
 
   return {
     level: 1,
-    round: "load",
+    round,
     questions,
   };
+}
+
+export function createLevelOneLoadQuestion(
+  usedPairs: GroupingPair[] = [],
+  random: () => number = Math.random,
+  previousTemplateIndex: number | null = null,
+): PackQuestion {
+  return createLevelOneQuestion("load", usedPairs, random, previousTemplateIndex);
+}
+
+export function createLevelOnePackQuestion(
+  usedPairs: GroupingPair[] = [],
+  random: () => number = Math.random,
+  previousTemplateIndex: number | null = null,
+): PackQuestion {
+  return createLevelOneQuestion("pack", usedPairs, random, previousTemplateIndex);
+}
+
+export function createLevelOneShipQuestion(
+  usedPairs: GroupingPair[] = [],
+  random: () => number = Math.random,
+  previousTemplateIndex: number | null = null,
+): PackQuestion {
+  return createLevelOneQuestion("ship", usedPairs, random, previousTemplateIndex);
+}
+
+export function createLevelOneLoadRound(random: () => number = Math.random): RoundConfig {
+  return createLevelOneRound("load", random);
+}
+
+export function createLevelOnePackRound(random: () => number = Math.random): RoundConfig {
+  return createLevelOneRound("pack", random);
+}
+
+export function createLevelOneShipRound(random: () => number = Math.random): RoundConfig {
+  return createLevelOneRound("ship", random);
 }

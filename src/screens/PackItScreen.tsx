@@ -5,7 +5,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import PhantomHand from "../components/PhantomHand";
 import GameLayout from "../components/GameLayout";
 import { makeRound } from "../game/packItGame";
-import type { PackQuestion } from "../calculations/types.ts";
+import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import { getDemoConfig } from "../demoMode";
 import {
   ensureAudioReady,
@@ -175,7 +175,11 @@ function buildRobotTargetAssignments(
 
 function isHighlightedToken(token: string): boolean {
   const normalized = token.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return /\d/.test(token) || QUESTION_KEYWORDS.has(normalized);
+  return QUESTION_KEYWORDS.has(normalized);
+}
+
+function isNumericToken(token: string): boolean {
+  return /\d/.test(token);
 }
 
 function isMathSymbolToken(token: string): boolean {
@@ -185,6 +189,15 @@ function isMathSymbolToken(token: string): boolean {
 const QUESTION_KEYWORD_COLOR = "#facc15";
 const QUESTION_SYMBOL_COLOR = "#66ff66";
 const RETURN_ANIMATION_MS = 220;
+const PACK_HOLD_DELAY_MS = 300;
+const PACK_HOLD_INTERVAL_MS = 150;
+const SHIP_RESULT_DELAY_MS = 500;
+const ROUND_LABELS: Record<RoundName, string> = {
+  load: "Load",
+  pack: "Pack",
+  ship: "Ship",
+};
+const ROUND_SEQUENCE: RoundName[] = ["load", "pack", "ship"];
 
 function renderHighlightedQuestion(
   text: string,
@@ -209,7 +222,9 @@ function renderHighlightedQuestion(
         style={
           isMathSymbolToken(part)
             ? { color: colors?.symbol ?? "#86efac" }
-            : isHighlightedToken(part)
+            : isNumericToken(part)
+              ? { color: QUESTION_KEYWORD_COLOR }
+              : isHighlightedToken(part)
               ? { color: colors?.highlight ?? "#facc15" }
               : colors?.normal
                 ? { color: colors.normal }
@@ -1328,7 +1343,8 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
 
 export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
-  const round = useMemo(() => makeRound(1, "load"), []);
+  const [roundName, setRoundName] = useState<RoundName>("load");
+  const round = useMemo(() => makeRound(1, roundName), [roundName]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [items, setItems] = useState<PackedItem[]>(() =>
     buildInitialItems(round.questions[0]),
@@ -1374,7 +1390,6 @@ export default function PackItScreen() {
   >(null);
   const [isGroupingPreviewAnimating, setIsGroupingPreviewAnimating] =
     useState(false);
-  const [hoveredSourceArea, setHoveredSourceArea] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
   const nextComboIdRef = useRef(1);
   const containerRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -1407,9 +1422,12 @@ export default function PackItScreen() {
   } | null>(null);
   const snipDragRef = useRef<SnipDragState | null>(null);
   const captureFlashTimerRef = useRef<number | null>(null);
+  const packHoldStartTimerRef = useRef<number | null>(null);
+  const packHoldIntervalRef = useRef<number | null>(null);
   const itemsRef = useRef<PackedItem[]>(items);
 
   const question = round.questions[questionIndex];
+  const isTapFillRound = question.round === "pack" || question.round === "ship";
   const containers = Array.from({ length: question.groupsA }, (_, index) =>
     items
       .filter((item) => item.containerIndex === index)
@@ -1417,7 +1435,10 @@ export default function PackItScreen() {
   );
   const remainingItems = items.filter((item) => item.containerIndex === null);
   const packedItemsTotal = items.length - remainingItems.length;
-  const canSubmit = packedItemsTotal > 0 && revealCtaMode === null;
+  const canSubmit =
+    revealCtaMode === null &&
+    !isCalculatorAdjusting &&
+    (question.round === "ship" ? true : packedItemsTotal > 0);
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const returningItemIds = new Set(returnStates.map((state) => state.itemId));
   const draggedItemIds = new Set(dragState?.itemIds ?? []);
@@ -1456,6 +1477,13 @@ export default function PackItScreen() {
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  useEffect(() => {
+    setItems(buildInitialItems(round.questions[0]));
+    setDisplayTopBoxCount(0);
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+  }, [round]);
 
   useEffect(() => {
     if (!isGroupingPreviewActive) {
@@ -1557,6 +1585,12 @@ export default function PackItScreen() {
       if (captureFlashTimerRef.current !== null) {
         window.clearTimeout(captureFlashTimerRef.current);
       }
+      if (packHoldStartTimerRef.current !== null) {
+        window.clearTimeout(packHoldStartTimerRef.current);
+      }
+      if (packHoldIntervalRef.current !== null) {
+        window.clearInterval(packHoldIntervalRef.current);
+      }
       keypadAdjustTimersRef.current.forEach((timer) =>
         window.clearTimeout(timer),
       );
@@ -1636,6 +1670,7 @@ export default function PackItScreen() {
   }
 
   function finalizeQuestionReset() {
+    clearPackHoldTimers();
     if (returnTimerRef.current !== null) {
       window.clearTimeout(returnTimerRef.current);
       returnTimerRef.current = null;
@@ -1663,7 +1698,6 @@ export default function PackItScreen() {
     setTypedStepLengths([]);
     setShowNextQuestionButton(false);
     setRevealCtaMode(null);
-    setHoveredSourceArea(false);
     setSelectedItemIds([]);
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
@@ -1699,6 +1733,7 @@ export default function PackItScreen() {
   }
 
   function handleToolbarRefresh() {
+    clearPackHoldTimers();
     if (demoTimerRef.current !== null) {
       window.clearTimeout(demoTimerRef.current);
       demoTimerRef.current = null;
@@ -1733,6 +1768,7 @@ export default function PackItScreen() {
   }
 
   function handleRestart() {
+    clearPackHoldTimers();
     if (demoTimerRef.current !== null) {
       window.clearTimeout(demoTimerRef.current);
       demoTimerRef.current = null;
@@ -1772,7 +1808,6 @@ export default function PackItScreen() {
     setTypedStepLengths([]);
     setShowNextQuestionButton(false);
     setRevealCtaMode(null);
-    setHoveredSourceArea(false);
     setSelectedItemIds([]);
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
@@ -1810,6 +1845,119 @@ export default function PackItScreen() {
     continuousAutopilotStartIndexRef.current = 0;
   }
 
+  function handleRoundChange(nextRound: RoundName) {
+    if (nextRound === roundName) {
+      return;
+    }
+
+    clearPackHoldTimers();
+    setRoundName(nextRound);
+    setQuestionIndex(0);
+    setShowUnitReveal(false);
+    setIsRoundComplete(false);
+    setQuestionSolved(false);
+    setDragState(null);
+    setHoveredContainerIndex(null);
+    setReturnStates([]);
+    setPhantomPos(null);
+    setPhantomDragState(null);
+    setGroupingAnchorItemId(null);
+    setIsGroupingPreviewAnimating(false);
+    setIsQuestionDemo(false);
+    setFlash(null);
+    setMistakeQuestionIndexes([]);
+    setTypedQuestionLength(0);
+    setTypedStepLengths([]);
+    setShowNextQuestionButton(false);
+    setRevealCtaMode(null);
+    setSelectedItemIds([]);
+    setDisplayTopBoxCount(0);
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+    setForceAnswerBanner(false);
+    setIsCalculatorAdjusting(false);
+    setIsContinuousAutopilot(false);
+    setQuestionResetKey((current) => current + 1);
+    dragSoundPointRef.current = null;
+    nextComboIdRef.current = 1;
+    cheatBufferRef.current = "";
+    continuousAutopilotStartIndexRef.current = 0;
+    clearKeypadAdjustTimers();
+    clearAutopilotSfxTimers();
+  }
+
+  function jumpToQuestionIndex(nextIndex: number) {
+    if (nextIndex < 0 || nextIndex >= round.questions.length) {
+      return;
+    }
+
+    clearPackHoldTimers();
+    clearKeypadAdjustTimers();
+    clearAutopilotSfxTimers();
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+      autopilotAdvanceTimerRef.current = null;
+    }
+    if (continuousAutopilotStartTimerRef.current !== null) {
+      window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      continuousAutopilotStartTimerRef.current = null;
+    }
+
+    setQuestionIndex(nextIndex);
+    setItems(buildInitialItems(round.questions[nextIndex]));
+    setShowUnitReveal(false);
+    setIsRoundComplete(false);
+    setQuestionSolved(false);
+    setDragState(null);
+    setHoveredContainerIndex(null);
+    setReturnStates([]);
+    setPhantomPos(null);
+    setPhantomDragState(null);
+    setGroupingAnchorItemId(null);
+    setIsGroupingPreviewAnimating(false);
+    setIsQuestionDemo(false);
+    setFlash(null);
+    setTypedQuestionLength(0);
+    setTypedStepLengths([]);
+    setShowNextQuestionButton(false);
+    setRevealCtaMode(null);
+    setSelectedItemIds([]);
+    setDisplayTopBoxCount(0);
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+    setForceAnswerBanner(false);
+    setIsCalculatorAdjusting(false);
+    setIsContinuousAutopilot(false);
+    setQuestionResetKey((current) => current + 1);
+    dragSoundPointRef.current = null;
+    nextComboIdRef.current = 1;
+  }
+
+  function handleDevProgressDotClick(dotIndex: number) {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    if (dotIndex < 0 || dotIndex >= progressTotal) {
+      return;
+    }
+
+    if (dotIndex >= round.questions.length - 1) {
+      const roundPosition = ROUND_SEQUENCE.indexOf(roundName);
+      const nextRound = ROUND_SEQUENCE[roundPosition + 1];
+      if (nextRound) {
+        handleRoundChange(nextRound);
+        return;
+      }
+
+      setIsRoundComplete(true);
+      playLevelComplete();
+      return;
+    }
+
+    jumpToQuestionIndex(dotIndex + 1);
+  }
+
   function assignItems(
     itemIds: number[],
     getContainerIndex: (itemId: number, index: number) => number | null,
@@ -1834,7 +1982,6 @@ export default function PackItScreen() {
     );
     setDragState(null);
     setHoveredContainerIndex(null);
-    setHoveredSourceArea(false);
     setSelectedItemIds([]);
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
@@ -2065,7 +2212,116 @@ export default function PackItScreen() {
     }, 520);
   }
 
-  function applyCalculatorTarget(rawValue: string) {
+  function clearPackHoldTimers() {
+    if (packHoldStartTimerRef.current !== null) {
+      window.clearTimeout(packHoldStartTimerRef.current);
+      packHoldStartTimerRef.current = null;
+    }
+    if (packHoldIntervalRef.current !== null) {
+      window.clearInterval(packHoldIntervalRef.current);
+      packHoldIntervalRef.current = null;
+    }
+  }
+
+  function animateSingleItemToContainer(itemId: number, containerIndex: number) {
+    const itemNode = itemRefs.current[itemId];
+    const startCenter = getScreenCenter(itemNode);
+
+    if (startCenter) {
+      setReturnStates([
+        {
+          itemId,
+          x: startCenter.x - 32,
+          y: startCenter.y - 32,
+          durationMs: 240,
+        },
+      ]);
+    }
+
+    setItems((currentItems) =>
+      currentItems.map((currentItem) =>
+        currentItem.id === itemId
+          ? { ...currentItem, containerIndex, comboId: null }
+          : currentItem,
+      ),
+    );
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const targetCenter = getScreenCenter(itemRefs.current[itemId]);
+        setReturnStates(
+          targetCenter
+            ? [
+                {
+                  itemId,
+                  x: targetCenter.x - 32,
+                  y: targetCenter.y - 32,
+                  durationMs: 240,
+                },
+              ]
+            : [],
+        );
+      });
+    });
+
+    if (returnTimerRef.current !== null) {
+      window.clearTimeout(returnTimerRef.current);
+    }
+    returnTimerRef.current = window.setTimeout(() => {
+      setReturnStates([]);
+    }, 280);
+  }
+
+  function addNextItemToContainer(containerIndex: number) {
+    if (!isTapFillRound || isQuestionDemo || revealCtaMode === "retry") {
+      return false;
+    }
+
+    const currentCount = getCurrentItemsInContainer(containerIndex).length;
+    if (currentCount >= question.unitRate) {
+      return false;
+    }
+
+    const nextItem = itemsRef.current
+      .filter((item) => item.containerIndex === null)
+      .sort((left, right) => left.id - right.id)[0];
+
+    if (!nextItem) {
+      return false;
+    }
+
+    ensureMusic();
+    playRipple(340 + containerIndex * 45);
+    animateSingleItemToContainer(nextItem.id, containerIndex);
+    return true;
+  }
+
+  function handleContainerPointerDown(
+    containerIndex: number,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) {
+    if (!isTapFillRound || isCalculatorAdjusting) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    clearPackHoldTimers();
+    setReturnStates([]);
+    addNextItemToContainer(containerIndex);
+
+    packHoldStartTimerRef.current = window.setTimeout(() => {
+      packHoldStartTimerRef.current = null;
+      packHoldIntervalRef.current = window.setInterval(() => {
+        const didAddItem = addNextItemToContainer(containerIndex);
+        if (!didAddItem) {
+          clearPackHoldTimers();
+        }
+      }, PACK_HOLD_INTERVAL_MS);
+    }, PACK_HOLD_DELAY_MS);
+  }
+
+  function applyCalculatorTarget(rawValue: string, onComplete?: () => void) {
     const parsed = Number.parseInt(rawValue, 10);
     const targetTopCount = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
     const currentTopCount = getCurrentItemsInContainer(0).length;
@@ -2083,6 +2339,7 @@ export default function PackItScreen() {
     if (targetTopCount === currentTopCount) {
       setCalculatorOverride(false);
       setIsCalculatorAdjusting(false);
+      onComplete?.();
       return;
     }
 
@@ -2095,6 +2352,7 @@ export default function PackItScreen() {
       );
       if (stepsToAdd === 0) {
         setIsCalculatorAdjusting(false);
+        onComplete?.();
         return;
       }
       const itemCountToAdd = stepsToAdd * question.groupsA;
@@ -2115,6 +2373,7 @@ export default function PackItScreen() {
         if (targetTopCount <= currentTopCount + stepsToAdd) {
           setCalculatorOverride(false);
         }
+        onComplete?.();
       }, 560);
       return;
     }
@@ -2136,6 +2395,7 @@ export default function PackItScreen() {
     scheduleAdjustTimer(() => {
       setIsCalculatorAdjusting(false);
       setCalculatorOverride(false);
+      onComplete?.();
     }, 480);
   }
 
@@ -2146,6 +2406,11 @@ export default function PackItScreen() {
 
     setCalculatorInput(normalizedValue);
     setCalculatorOverride(true);
+
+    if (question.round === "ship") {
+      clearKeypadAdjustTimers();
+      return;
+    }
 
     clearKeypadAdjustTimers();
     keypadDebounceRef.current = window.setTimeout(() => {
@@ -2351,6 +2616,114 @@ export default function PackItScreen() {
       return;
     }
 
+    if (roundName === "pack" || roundName === "ship") {
+      setIsQuestionDemo(true);
+      setRevealCtaMode(null);
+      markQuestionPenalty();
+      setPhantomDragState(null);
+      setSelectedItemIds([]);
+      setGroupingAnchorItemId(null);
+      setIsGroupingPreviewAnimating(false);
+      clearKeypadAdjustTimers();
+      if (displaySyncLockRef.current !== null) {
+        window.clearTimeout(displaySyncLockRef.current);
+        displaySyncLockRef.current = null;
+      }
+      setCalculatorInput("0");
+      setCalculatorOverride(true);
+      setDisplayTopBoxCount(0);
+
+      const answerDigits = String(question.answer).split("");
+      const KEY_MOVE_MS = 280;
+      const KEY_PRESS_MS = 120;
+      const KEY_SETTLE_MS = 220;
+      const POST_INPUT_SETTLE_MS = roundName === "pack" ? 700 : 0;
+      let timelineMs = 0;
+      let autopilotDisplayValue = "0";
+
+      answerDigits.forEach((digit) => {
+        const keyCenter = getKeypadButtonCenter(digit);
+        if (!keyCenter) {
+          return;
+        }
+
+        window.setTimeout(() => {
+          setPhantomPos({
+            ...keyCenter,
+            isClicking: false,
+            durationMs: KEY_MOVE_MS,
+          });
+        }, timelineMs);
+
+        window.setTimeout(() => {
+          setPhantomPos({
+            ...keyCenter,
+            isClicking: true,
+            durationMs: KEY_PRESS_MS,
+          });
+        }, timelineMs + KEY_MOVE_MS);
+
+        window.setTimeout(() => {
+          playKeyClick();
+          autopilotDisplayValue =
+            autopilotDisplayValue === "" || autopilotDisplayValue === "0"
+              ? digit
+              : autopilotDisplayValue === "-0"
+                ? `-${digit}`
+                : `${autopilotDisplayValue}${digit}`;
+
+          if (roundName === "pack") {
+            handleCalculatorChange(autopilotDisplayValue);
+          } else {
+            setCalculatorOverride(true);
+            setCalculatorInput(autopilotDisplayValue);
+          }
+        }, timelineMs + KEY_MOVE_MS + KEY_PRESS_MS);
+
+        timelineMs += KEY_MOVE_MS + KEY_PRESS_MS + KEY_SETTLE_MS;
+      });
+
+      const submitButtonCenter = getSubmitButtonCenter();
+      if (!submitButtonCenter) {
+        setPhantomPos(null);
+        setIsQuestionDemo(false);
+        return;
+      }
+
+      window.setTimeout(() => {
+        setPhantomPos({
+          ...submitButtonCenter,
+          isClicking: false,
+          durationMs: 80,
+        });
+      }, timelineMs + POST_INPUT_SETTLE_MS);
+
+      window.setTimeout(() => {
+        setPhantomPos({
+          ...submitButtonCenter,
+          isClicking: true,
+          durationMs: 120,
+        });
+        playKeyClick();
+      }, timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS);
+
+      window.setTimeout(() => {
+        document
+          .querySelector<HTMLButtonElement>('[data-autopilot-key="submit"]')
+          ?.click();
+      }, timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS + KEY_PRESS_MS);
+
+      window.setTimeout(() => {
+        setPhantomPos(null);
+        setIsQuestionDemo(false);
+        if (mode === "retry") {
+          setRevealCtaMode("retry");
+        }
+      }, timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS + KEY_PRESS_MS + 1600);
+
+      return;
+    }
+
     setIsQuestionDemo(true);
     setRevealCtaMode(null);
     markQuestionPenalty();
@@ -2551,6 +2924,27 @@ export default function PackItScreen() {
   }
 
   function handleSubmitAnswer() {
+    if (question.round === "ship") {
+      const submittedAnswer = Number.parseInt(calculatorInput, 10);
+      applyCalculatorTarget(calculatorInput, () => {
+        window.setTimeout(() => {
+          const isCorrect = submittedAnswer === question.unitRate;
+
+          if (isCorrect) {
+            applyCorrectAnswerResult("next");
+            return;
+          }
+
+          setShowUnitReveal(false);
+          setQuestionSolved(false);
+          setFlash({ ok: false, icon: true });
+          markQuestionPenalty();
+          playWrong();
+        }, SHIP_RESULT_DELAY_MS);
+      });
+      return;
+    }
+
     const isCorrect =
       remainingItems.length === 0 &&
       containers.every(
@@ -2573,6 +2967,10 @@ export default function PackItScreen() {
     itemId: number,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
+    if (isTapFillRound) {
+      return;
+    }
+
     if (isQuestionDemo || revealCtaMode === "retry" || isCalculatorAdjusting) {
       return;
     }
@@ -2645,17 +3043,13 @@ export default function PackItScreen() {
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!dragState) {
+    if (isTapFillRound) {
       return;
     }
 
-    const sourceRect = sourceAreaRef.current?.getBoundingClientRect();
-    const isOverSource = sourceRect
-      ? event.clientX >= sourceRect.left &&
-        event.clientX <= sourceRect.right &&
-        event.clientY >= sourceRect.top &&
-        event.clientY <= sourceRect.bottom
-      : false;
+    if (!dragState) {
+      return;
+    }
 
     const topContainer = containerRefs.current[0];
     const hitIndex = topContainer
@@ -2671,8 +3065,6 @@ export default function PackItScreen() {
       : -1;
 
     setHoveredContainerIndex(hitIndex >= 0 ? hitIndex : null);
-    setHoveredSourceArea(isOverSource);
-
     const lastPoint = dragSoundPointRef.current;
     if (lastPoint) {
       const dx = event.clientX - lastPoint.x;
@@ -2726,6 +3118,12 @@ export default function PackItScreen() {
   }
 
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    clearPackHoldTimers();
+
+    if (isTapFillRound) {
+      return;
+    }
+
     if (!dragState) {
       return;
     }
@@ -2783,7 +3181,6 @@ export default function PackItScreen() {
     setReturnStates(originStates.map(({ itemId, x, y }) => ({ itemId, x, y })));
     setDragState(null);
     setHoveredContainerIndex(null);
-    setHoveredSourceArea(false);
     setSelectedItemIds([]);
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
@@ -3110,6 +3507,13 @@ export default function PackItScreen() {
     return getScreenCenter(submitButton ?? null);
   }
 
+  function getKeypadButtonCenter(key: string): { x: number; y: number } | null {
+    const button = document.querySelector<HTMLButtonElement>(
+      `[data-autopilot-key="${key}"]`,
+    );
+    return getScreenCenter(button ?? null);
+  }
+
   function isCurrentBoardCorrect() {
     const currentItems = itemsRef.current;
     if (currentItems.some((item) => item.containerIndex === null)) {
@@ -3142,7 +3546,6 @@ export default function PackItScreen() {
     setShowNextQuestionButton(false);
     setRevealCtaMode(null);
     setHoveredContainerIndex(null);
-    setHoveredSourceArea(false);
 
     const startStates = packedItems
       .map((item) => {
@@ -3209,7 +3612,6 @@ export default function PackItScreen() {
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
     setIsQuestionDemo(false);
-    setHoveredSourceArea(false);
     setSelectedItemIds([]);
     setDisplayTopBoxCount(0);
     setCalculatorInput("0");
@@ -3319,7 +3721,7 @@ export default function PackItScreen() {
             goToNextQuestion();
           }, 1000);
         }, 220);
-      }, 2000);
+      }, 1000);
       return;
     }
 
@@ -3378,14 +3780,52 @@ export default function PackItScreen() {
     };
   }, [goToNextQuestion, handleNowYourTurn, revealCtaMode, showNextQuestionButton]);
 
+  useEffect(() => {
+    if (!isRoundComplete) {
+      return;
+    }
+
+    function handleRoundCompleteEnter(event: KeyboardEvent) {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleRoundCompleteContinue();
+    }
+
+    window.addEventListener("keydown", handleRoundCompleteEnter);
+    return () => {
+      window.removeEventListener("keydown", handleRoundCompleteEnter);
+    };
+  }, [isRoundComplete, roundName]);
+
   const visibleStepLines = showUnitReveal
     ? question.blackboardSteps
         .map((line, index) => line.slice(0, typedStepLengths[index] ?? 0))
         .filter((line) => line.length > 0)
     : [];
-  const visibleQuestionText = isRoundComplete
-    ? ""
-    : question.questionText.slice(0, typedQuestionLength);
+  const visibleQuestionText = question.questionText.slice(0, typedQuestionLength);
+  const nextRoundName = ROUND_SEQUENCE[ROUND_SEQUENCE.indexOf(roundName) + 1] ?? null;
+
+  function handleRoundCompleteContinue() {
+    if (nextRoundName) {
+      handleRoundChange(nextRoundName);
+      return;
+    }
+
+    handleRestart();
+  }
 
   const questionPanel = ({
     calculatorMinimized,
@@ -3426,17 +3866,11 @@ export default function PackItScreen() {
               color: messageTheme.text,
             }}
           >
-            {isRoundComplete ? (
-              <span style={{ color: messageTheme.complete }}>
-                Round complete. Score: {score}/{round.questions.length}
-              </span>
-            ) : (
-              renderHighlightedQuestion(visibleQuestionText, {
-                normal: messageTheme.text,
-                highlight: QUESTION_KEYWORD_COLOR,
-                symbol: QUESTION_SYMBOL_COLOR,
-              })
-            )}
+            {renderHighlightedQuestion(visibleQuestionText, {
+              normal: messageTheme.text,
+              highlight: QUESTION_KEYWORD_COLOR,
+              symbol: QUESTION_SYMBOL_COLOR,
+            })}
           </div>
           <div
             className="flex-1"
@@ -3485,13 +3919,7 @@ export default function PackItScreen() {
                                 ? handleNowYourTurn
                                 : goToNextQuestion
                             }
-                            className="ml-4 inline-flex h-[2rem] cursor-pointer items-center rounded-full border-[3px] px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
-                            style={{
-                              borderColor: messageTheme.highlight,
-                              background: messageTheme.outerBackground,
-                              color: "#f8fafc",
-                              boxShadow: `0 0 10px ${messageTheme.highlight}33, 0 0 0 2px ${messageTheme.outerBorder}`,
-                            }}
+                            className="arcade-button ml-4 inline-flex h-[2rem] cursor-pointer items-center rounded-full px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
                           >
                             {revealCtaMode === "retry"
                               ? "Now you try it"
@@ -3532,8 +3960,6 @@ export default function PackItScreen() {
         canSubmit={canSubmit}
         calculatorTopBanner={calculatorTopBanner}
         chromeTheme={chromeTheme}
-        progress={autopilotProgress}
-        progressTotal={progressTotal}
         levelCount={4}
         currentLevel={1}
         unlockedLevel={1}
@@ -3547,7 +3973,54 @@ export default function PackItScreen() {
             onPointerDownCapture={ensureAudioReady}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
           >
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center">
+              <div className="pointer-events-auto flex flex-col items-center gap-0">
+                <div className="inline-flex items-center gap-2 rounded-full px-2 py-1">
+                  {(["load", "pack", "ship"] as const).map((candidateRound) => {
+                    const isActive = candidateRound === roundName;
+                    return (
+                      <button
+                        key={candidateRound}
+                        type="button"
+                        onClick={() => handleRoundChange(candidateRound)}
+                        className="rounded-full border-[3px] px-3 py-1 font-arcade text-[0.8rem] font-bold uppercase tracking-[0.08em] text-white transition-all duration-150 hover:scale-[1.03] active:scale-[0.98]"
+                        style={{
+                          borderColor: isActive ? "#67e8f9" : "rgba(100,116,139,0.7)",
+                          background: isActive ? "rgba(8,47,73,0.96)" : "rgba(15,23,42,0.78)",
+                          color: isActive ? "#67e8f9" : "#e2e8f0",
+                          boxShadow: isActive ? "0 0 16px rgba(103,232,249,0.24)" : "none",
+                        }}
+                      >
+                        {ROUND_LABELS[candidateRound]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-center gap-1.5">
+                  {Array.from({ length: progressTotal }, (_, index) => {
+                    const filled = index < autopilotProgress;
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleDevProgressDotClick(index)}
+                        disabled={!import.meta.env.DEV}
+                        className="h-3.5 w-3.5 rounded-full border-2 transition-all duration-300 disabled:cursor-default"
+                        style={{
+                          background: filled ? "#67e8f9" : "transparent",
+                          borderColor: filled ? "#67e8f9" : "rgba(255,255,255,0.26)",
+                          boxShadow: filled ? "0 0 8px rgba(103,232,249,0.8)" : undefined,
+                          transform: filled ? "scale(1.15)" : "scale(1)",
+                          cursor: import.meta.env.DEV ? "pointer" : "default",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
             <div className="flex h-full flex-col px-0 pb-0 pt-[3.6rem]">
               <div className="relative flex-1 overflow-hidden bg-transparent">
                 <div
@@ -3619,7 +4092,9 @@ export default function PackItScreen() {
                           boxShadow:
                             "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
                         }}
-                        onClick={animateItemsBackToSource}
+                        onClick={() => {
+                          animateItemsBackToSource();
+                        }}
                       >
                         Now you try it
                       </button>
@@ -3628,9 +4103,9 @@ export default function PackItScreen() {
                   <div
                     className="pointer-events-none absolute z-[1] w-[2px] bg-white"
                     style={{
-                      left: "46.25%",
-                      top: "0",
-                      height: "99%",
+                      left: "50%",
+                      top: "15px",
+                      height: "96%",
                       opacity: 0.2,
                     }}
                   />
@@ -3652,15 +4127,11 @@ export default function PackItScreen() {
                     </div>
                   </div>
 
-                  <div className="relative z-[3] grid h-full grid-cols-[45.5%_calc(54.5%-2rem)] gap-8 px-0 pb-0 pt-7">
+                  <div className="relative z-[3] grid h-full grid-cols-[50%_50%] gap-0 px-0 pb-0 pt-7">
                     <div
                       ref={sourceAreaRef}
-                      className="relative h-full bg-transparent pl-4 pr-5 pt-4"
-                      style={{
-                        boxShadow: hoveredSourceArea
-                          ? "inset 0 0 0 2px rgba(250,204,21,0.45), 0 0 18px rgba(250,204,21,0.18)"
-                          : "none",
-                      }}
+                      className="relative h-full bg-transparent pl-4 pr-4 pt-4"
+                      style={{ boxShadow: "none" }}
                     >
                       <div className="flex min-h-[7rem] flex-wrap content-start justify-start gap-4">
                         {items
@@ -3699,7 +4170,9 @@ export default function PackItScreen() {
                                       ? 0
                                       : 1,
                                   pointerEvents:
-                                    revealCtaMode === "retry" || isQuestionDemo
+                                    revealCtaMode === "retry" ||
+                                    isQuestionDemo ||
+                                    isTapFillRound
                                       ? "none"
                                       : "auto",
                                 }}
@@ -3739,7 +4212,7 @@ export default function PackItScreen() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 content-start pt-1">
+                    <div className="grid grid-cols-1 content-start gap-3 pl-4 pr-4 pt-1">
                       {containers.map((containerItems, index) =>
                         (() => {
                           const isHovered =
@@ -3748,36 +4221,26 @@ export default function PackItScreen() {
                           const isDisabledBox = index !== 0;
                           const isOverfilled =
                             containerItems.length > question.unitRate;
-                          const isCorrect =
-                            containerItems.length === question.unitRate;
                           const borderColor = isHovered
                             ? "#facc15"
                             : isOverfilled
                               ? "#f87171"
-                              : isCorrect
-                                ? "#86efac"
-                                : isDisabledBox
+                              : isDisabledBox
                                   ? "rgba(100,116,139,0.4)"
                                   : "#475569";
                           const counterColor = isOverfilled
                             ? "#f87171"
-                            : isCorrect
-                              ? "#86efac"
-                              : isDisabledBox
+                            : isDisabledBox
                                 ? "rgba(103,232,249,0.42)"
                                 : "#67e8f9";
                           const counterGlow = isOverfilled
                             ? "rgba(248,113,113,0.72)"
-                            : isCorrect
-                              ? "rgba(134,239,172,0.72)"
-                              : isDisabledBox
+                            : isDisabledBox
                                 ? "rgba(103,232,249,0.28)"
                                 : "rgba(103,232,249,0.72)";
                           const counterGlowOuter = isOverfilled
                             ? "rgba(239,68,68,0.26)"
-                            : isCorrect
-                              ? "rgba(34,197,94,0.26)"
-                              : isDisabledBox
+                            : isDisabledBox
                                 ? "rgba(56,189,248,0.1)"
                                 : "rgba(56,189,248,0.26)";
 
@@ -3787,6 +4250,11 @@ export default function PackItScreen() {
                               ref={(node) => {
                                 containerRefs.current[index] = node;
                               }}
+                              onPointerDown={(event) =>
+                                isTapFillRound
+                                  ? handleContainerPointerDown(index, event)
+                                  : undefined
+                              }
                               className="relative min-h-[5rem] overflow-hidden rounded-[1.35rem] border-[3px] px-4 py-[0.35rem]"
                               style={{
                                 borderColor,
@@ -3831,10 +4299,11 @@ export default function PackItScreen() {
                                           : isDisabledBox
                                             ? 0.65
                                             : 1,
-                                      pointerEvents:
+                                  pointerEvents:
                                         revealCtaMode === "retry" ||
                                         isQuestionDemo ||
-                                        index !== 0
+                                        index !== 0 ||
+                                        isTapFillRound
                                           ? "none"
                                           : "auto",
                                     }}
@@ -4088,6 +4557,54 @@ export default function PackItScreen() {
               "radial-gradient(circle at center, rgba(255,255,255,0.94) 0%, rgba(255,255,255,0.7) 22%, rgba(255,255,255,0.18) 52%, rgba(255,255,255,0) 78%)",
           }}
         />
+      )}
+      {isRoundComplete && (
+        <div
+          className="absolute inset-0 z-[130] flex items-center justify-center p-6"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(15,23,42,0.985) 0%, rgba(2,6,23,0.995) 78%)",
+          }}
+        >
+          <div
+            className="arcade-panel w-full max-w-3xl p-6 text-center md:p-10"
+            style={{
+              background: "rgba(15, 23, 42, 0.84)",
+            }}
+          >
+            <div className="text-4xl font-black uppercase tracking-[0.18em] text-yellow-300 md:text-5xl">
+              {ROUND_LABELS[roundName]} Complete
+            </div>
+            <div className="mt-3 text-base font-bold text-cyan-200 md:text-lg">
+              Score: {score}/{round.questions.length}
+            </div>
+            <div className="mt-5 flex items-center justify-center gap-1.5">
+              {Array.from({ length: round.questions.length }, (_, index) => {
+                const filled = index < score;
+                return (
+                  <div
+                    key={index}
+                    className="h-4 w-4 rounded-full border-2"
+                    style={{
+                      background: filled ? "#67e8f9" : "transparent",
+                      borderColor: filled ? "#67e8f9" : "rgba(255,255,255,0.26)",
+                      boxShadow: filled ? "0 0 10px rgba(103,232,249,0.8)" : undefined,
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-8">
+              <button
+                type="button"
+                onClick={handleRoundCompleteContinue}
+                className="arcade-button inline-flex h-12 items-center rounded-full px-6 font-arcade text-base font-bold uppercase tracking-[0.08em] text-white"
+              >
+                {nextRoundName ? `Next: ${ROUND_LABELS[nextRoundName]}` : "Play Again"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {flash?.icon &&
         typeof document !== "undefined" &&
