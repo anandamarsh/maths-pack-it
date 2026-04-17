@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import type { PhantomPos } from "../hooks/useAutopilot";
 
 interface Props {
@@ -13,11 +14,11 @@ const AUTOPILOT_HAND_GLOW = "rgba(56,216,255,0.82)";
  * pointer-events: none so it never blocks real interaction.
  */
 export default function PhantomHand({ pos }: Props) {
-  if (!pos) return null;
+  if (!pos || typeof document === "undefined") return null;
 
   const transitionMs = pos.durationMs ?? 460;
 
-  return (
+  return createPortal(
     <div
       aria-hidden="true"
       className="pointer-events-none fixed z-[200]"
@@ -57,6 +58,7 @@ export default function PhantomHand({ pos }: Props) {
           paintOrder="stroke"
         />
       </svg>
-    </div>
+    </div>,
+    document.body,
   );
 }
