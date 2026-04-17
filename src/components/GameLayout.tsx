@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
-import { useIsCoarsePointer, useIsMobileLandscape } from "../hooks/useMediaQuery";
+import {
+  useIsCoarsePointer,
+  useIsMobileLandscape,
+} from "../hooks/useMediaQuery";
 import { useT } from "../i18n";
 import { SocialComments, SocialShare, openCommentsComposer } from "./Social";
 import AudioButton from "./AudioButton";
@@ -12,7 +15,8 @@ import LevelButtons from "./LevelButtons";
 import NumericKeypad from "./NumericKeypad";
 import QuestionBox from "./QuestionBox";
 
-const YOUTUBE_BUBBLE_DISMISSED_KEY = "maths-game-template:youtube-bubble-dismissed";
+const YOUTUBE_BUBBLE_DISMISSED_KEY =
+  "maths-game-template:youtube-bubble-dismissed";
 const YOUTUBE_ICON_URL = "/youtube-circle-logo-svgrepo-com.svg";
 
 function readYouTubeBubbleDismissed() {
@@ -26,7 +30,9 @@ function toYouTubeEmbedUrl(url: string): string | null {
     const videoId = parsed.hostname.includes("youtu.be")
       ? parsed.pathname.replace(/^\/+/, "")
       : (parsed.searchParams.get("v") ??
-        (parsed.pathname.startsWith("/shorts/") ? parsed.pathname.split("/")[2] : null));
+        (parsed.pathname.startsWith("/shorts/")
+          ? parsed.pathname.split("/")[2]
+          : null));
     if (!videoId) return null;
     return `https://www.youtube.com/embed/${videoId}`;
   } catch {
@@ -146,12 +152,16 @@ export default function GameLayout({
   const isMobileLandscape = useIsMobileLandscape();
   const isCoarsePointer = useIsCoarsePointer();
   // Minimized by default on touch devices; expanded by default on desktop
-  const [calcMinimized, setCalcMinimized] = useState(() => isMobileLandscape || isCoarsePointer);
+  const [calcMinimized, setCalcMinimized] = useState(
+    () => isMobileLandscape || isCoarsePointer,
+  );
   // Effective minimized state: autopilot forces expansion when needed
   const effectiveCalcMinimized = forceKeypadExpanded ? false : calcMinimized;
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareDrawerOpen, setShareDrawerOpen] = useState(false);
-  const [youtubeBubbleDismissed, setYoutubeBubbleDismissed] = useState(readYouTubeBubbleDismissed);
+  const [youtubeBubbleDismissed, setYoutubeBubbleDismissed] = useState(
+    readYouTubeBubbleDismissed,
+  );
   const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string | null>(null);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
 
@@ -167,7 +177,8 @@ export default function GameLayout({
       })
       .then((manifest) => {
         if (cancelled) return;
-        const rawVideoUrl = typeof manifest.videoUrl === "string" ? manifest.videoUrl.trim() : "";
+        const rawVideoUrl =
+          typeof manifest.videoUrl === "string" ? manifest.videoUrl.trim() : "";
         setYoutubeEmbedUrl(rawVideoUrl ? toYouTubeEmbedUrl(rawVideoUrl) : null);
       })
       .catch(() => {
@@ -206,7 +217,9 @@ export default function GameLayout({
           title: t("social.shareTitle"),
           url: "https://interactive-maths.vercel.app/",
         });
-      } catch { /* dismissed */ }
+      } catch {
+        /* dismissed */
+      }
     } else {
       setShareDrawerOpen((o) => !o);
     }
@@ -218,10 +231,14 @@ export default function GameLayout({
       : null;
   const dockHeight = effectiveCalcMinimized
     ? "4.5rem"
-    : calculatorTopBanner
-      ? "17.9rem"
-      : "15.25rem";
+    : isMobileLandscape
+      ? "19rem"
+      : calculatorTopBanner
+        ? "17.9rem"
+        : "15.25rem";
   const dockTransition = "320ms cubic-bezier(0.22,0.72,0.2,1)";
+  const hideCanvasForExpandedMobileKeypad =
+    isMobileLandscape && !effectiveCalcMinimized;
 
   return (
     <div
@@ -236,16 +253,34 @@ export default function GameLayout({
 
       {/* ── Comments drawer ──────────────────────────────────────────────── */}
       {commentsOpen && (
-        <div className="social-backdrop" onClick={() => setCommentsOpen(false)} />
+        <div
+          className="social-backdrop"
+          onClick={() => setCommentsOpen(false)}
+        />
       )}
-      <div className={`social-comments-drawer social-drawer ${commentsOpen ? "is-open" : ""}`}>
+      <div
+        className={`social-comments-drawer social-drawer ${commentsOpen ? "is-open" : ""}`}
+      >
         <div className="social-drawer-header">
           {/* Add Comment on the left — opens compose area inside the iframe */}
-          <button className="social-new-comment" onClick={() => openCommentsComposer()}>
+          <button
+            className="social-new-comment"
+            onClick={() => openCommentsComposer()}
+          >
             {t("toolbar.addComment")}
           </button>
-          <button className="social-drawer-close" onClick={() => setCommentsOpen(false)}>
-            <svg className="social-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <button
+            className="social-drawer-close"
+            onClick={() => setCommentsOpen(false)}
+          >
+            <svg
+              className="social-close-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -257,13 +292,30 @@ export default function GameLayout({
 
       {/* ── Share fallback drawer (desktop without navigator.share) ─────── */}
       {shareDrawerOpen && (
-        <div className="social-backdrop" onClick={() => setShareDrawerOpen(false)} />
+        <div
+          className="social-backdrop"
+          onClick={() => setShareDrawerOpen(false)}
+        />
       )}
-      <div className={`social-share-drawer social-drawer ${shareDrawerOpen ? "is-open" : ""}`}>
+      <div
+        className={`social-share-drawer social-drawer ${shareDrawerOpen ? "is-open" : ""}`}
+      >
         <div className="social-drawer-header">
-          <h2 className="m-0 text-sm font-black uppercase tracking-wider">{t("toolbar.share")}</h2>
-          <button className="social-drawer-close" onClick={() => setShareDrawerOpen(false)}>
-            <svg className="social-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <h2 className="m-0 text-sm font-black uppercase tracking-wider">
+            {t("toolbar.share")}
+          </h2>
+          <button
+            className="social-drawer-close"
+            onClick={() => setShareDrawerOpen(false)}
+          >
+            <svg
+              className="social-close-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -273,7 +325,10 @@ export default function GameLayout({
 
       {youtubeModalOpen && youtubeEmbedUrl && (
         <>
-          <div className="social-backdrop social-video-backdrop" onClick={() => setYoutubeModalOpen(false)} />
+          <div
+            className="social-backdrop social-video-backdrop"
+            onClick={() => setYoutubeModalOpen(false)}
+          />
           <div
             className="social-video-modal"
             role="dialog"
@@ -286,7 +341,10 @@ export default function GameLayout({
               aria-label="Close how to play video"
               onClick={() => setYoutubeModalOpen(false)}
             >
-              <CloseIcon className="social-video-modal-close-icon" aria-hidden="true" />
+              <CloseIcon
+                className="social-video-modal-close-icon"
+                aria-hidden="true"
+              />
             </button>
             <iframe
               src={youtubeEmbedUrl}
@@ -305,10 +363,20 @@ export default function GameLayout({
           <div className="w-10 h-10 shrink-0" aria-hidden="true" />
 
           {onRestart && (
-            <button onClick={onRestart} title={t("toolbar.restart")}
-              className="arcade-button w-10 h-10 flex items-center justify-center p-2">
-              <svg viewBox="0 0 24 24" fill="none" className="w-full h-full"
-                stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <button
+              onClick={onRestart}
+              title={t("toolbar.restart")}
+              className="arcade-button w-10 h-10 flex items-center justify-center p-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="w-full h-full"
+                stroke="white"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
             </button>
@@ -317,10 +385,20 @@ export default function GameLayout({
           <AudioButton muted={muted} onToggle={onToggleMute} />
 
           {onCapture && (
-            <button onClick={onCapture} title={t("toolbar.screenshot")}
-              className="arcade-button w-10 h-10 flex items-center justify-center p-2">
-              <svg viewBox="0 0 24 24" fill="none" className="w-full h-full"
-                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button
+              onClick={onCapture}
+              title={t("toolbar.screenshot")}
+              className="arcade-button w-10 h-10 flex items-center justify-center p-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="w-full h-full"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
@@ -330,7 +408,11 @@ export default function GameLayout({
           {onToggleSquareSnip && (
             <button
               onClick={onToggleSquareSnip}
-              title={squareSnipActive ? "Hide square snip tool" : "Show square snip tool"}
+              title={
+                squareSnipActive
+                  ? "Hide square snip tool"
+                  : "Show square snip tool"
+              }
               className="arcade-button w-10 h-10 flex items-center justify-center p-2"
               style={
                 squareSnipActive
@@ -359,16 +441,32 @@ export default function GameLayout({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-                <circle cx="12" cy="13" r="1.9" stroke="white" strokeWidth="1.7" />
+                <circle
+                  cx="12"
+                  cy="13"
+                  r="1.9"
+                  stroke="white"
+                  strokeWidth="1.7"
+                />
               </svg>
             </button>
           )}
 
           {onRecordDemo && !isRecordingDemo && (
-            <button onClick={onRecordDemo} title="Record demo video"
-              className="arcade-button w-10 h-10 flex items-center justify-center p-2">
-              <svg viewBox="0 0 24 24" fill="none" className="w-full h-full"
-                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button
+              onClick={onRecordDemo}
+              title="Record demo video"
+              className="arcade-button w-10 h-10 flex items-center justify-center p-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className="w-full h-full"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="2" y="4" width="13" height="16" rx="2" />
                 <path d="m22 7-5 3.5V14l5 3.5Z" />
               </svg>
@@ -380,25 +478,33 @@ export default function GameLayout({
           className="absolute left-1/2 -translate-x-1/2 z-[61] flex flex-col items-center gap-1.5 pointer-events-auto"
           style={{ top: "0.5rem" }}
         >
-          {levelCount !== undefined && currentLevel !== undefined && unlockedLevel !== undefined && onLevelSelect && (
-            <LevelButtons
-              levelCount={levelCount}
-              currentLevel={currentLevel}
-              unlockedLevel={unlockedLevel}
-              onSelect={onLevelSelect}
-            />
-          )}
+          {levelCount !== undefined &&
+            currentLevel !== undefined &&
+            unlockedLevel !== undefined &&
+            onLevelSelect && (
+              <LevelButtons
+                levelCount={levelCount}
+                currentLevel={currentLevel}
+                unlockedLevel={unlockedLevel}
+                onSelect={onLevelSelect}
+              />
+            )}
 
           {dots && (
             <div className="flex items-center justify-center gap-1.5">
               {dots.map((filled, i) => (
-                <div key={i} className="w-3.5 h-3.5 rounded-full border-2 transition-all duration-300"
+                <div
+                  key={i}
+                  className="w-3.5 h-3.5 rounded-full border-2 transition-all duration-300"
                   style={{
                     background: filled ? "#67e8f9" : "transparent",
                     borderColor: filled ? "#67e8f9" : "rgba(255,255,255,0.26)",
-                    boxShadow: filled ? "0 0 8px rgba(103,232,249,0.8)" : undefined,
+                    boxShadow: filled
+                      ? "0 0 8px rgba(103,232,249,0.8)"
+                      : undefined,
                     transform: filled ? "scale(1.15)" : "scale(1)",
-                  }} />
+                  }}
+                />
               ))}
             </div>
           )}
@@ -419,22 +525,57 @@ export default function GameLayout({
             />
           )}
 
-          <button onClick={handleShare} title={t("toolbar.share")}
-            className={`social-launcher arcade-button ${shareDrawerOpen ? "is-active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" className="social-launcher-icon">
+          <button
+            onClick={handleShare}
+            title={t("toolbar.share")}
+            className={`social-launcher arcade-button ${shareDrawerOpen ? "is-active" : ""}`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="social-launcher-icon"
+            >
               <circle cx="18" cy="5" r="3" stroke="white" strokeWidth="2" />
               <circle cx="6" cy="12" r="3" stroke="white" strokeWidth="2" />
               <circle cx="18" cy="19" r="3" stroke="white" strokeWidth="2" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" stroke="white" strokeWidth="2" strokeLinecap="round" />
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" stroke="white" strokeWidth="2" strokeLinecap="round" />
+              <line
+                x1="8.59"
+                y1="13.51"
+                x2="15.42"
+                y2="17.49"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <line
+                x1="15.41"
+                y1="6.51"
+                x2="8.59"
+                y2="10.49"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
 
-          <button onClick={() => setCommentsOpen((o) => !o)} title={t("toolbar.comments")}
-            className={`social-launcher arcade-button ${commentsOpen ? "is-active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" className="social-launcher-icon">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <button
+            onClick={() => setCommentsOpen((o) => !o)}
+            title={t("toolbar.comments")}
+            className={`social-launcher arcade-button ${commentsOpen ? "is-active" : ""}`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="social-launcher-icon"
+            >
+              <path
+                d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
 
@@ -492,12 +633,14 @@ export default function GameLayout({
 
       {/* ── Rest: canvas (absolute) + floating bottom bar ───────────────── */}
       <div className="relative z-[1] flex-1 min-h-0 mx-0 mb-0">
-
         {/* Canvas — always fills the full rest area */}
         <div
           className="absolute left-0 right-0 top-0 overflow-hidden"
           style={{
             bottom: dockHeight,
+            opacity: hideCanvasForExpandedMobileKeypad ? 0 : 1,
+            pointerEvents: hideCanvasForExpandedMobileKeypad ? "none" : "auto",
+            visibility: hideCanvasForExpandedMobileKeypad ? "hidden" : "visible",
             transition: `bottom ${dockTransition}`,
           }}
         >
@@ -540,13 +683,15 @@ export default function GameLayout({
 
         {/* Bottom overlay — floats over canvas, anchored to bottom */}
         <div
-          className="absolute bottom-0 left-0 right-0 flex flex-row items-stretch gap-2"
+          className="absolute flex flex-row items-stretch gap-2"
           style={{
+            bottom: "3px",
+            left: "2px",
+            right: "2px",
             height: dockHeight,
             transition: `height ${dockTransition}`,
           }}
         >
-
           {/* Message box — same height as calculator, click = toggle */}
           {questionPanel !== undefined ? (
             <div className="flex-1 min-w-0">
@@ -568,24 +713,24 @@ export default function GameLayout({
               </QuestionBox>
             </div>
           ) : null}
- 
+
           {/* Calculator */}
           {!hideKeypad && (
             <div className="flex h-full min-h-0 flex-col justify-end self-stretch">
               {calculatorTopBanner ? (
-              <div
-                className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"
-                style={{
-                  background: "rgba(250,204,21,0.12)",
-                  borderColor: "#facc15",
-                  borderWidth: "3px",
-                  color: "#fde047",
-                  marginBottom: "2px",
-                  ...chromeTheme?.calculatorBannerStyle,
-                }}
-              >
-                {calculatorTopBanner}
-              </div>
+                <div
+                  className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"
+                  style={{
+                    background: "rgba(250,204,21,0.12)",
+                    borderColor: "#facc15",
+                    borderWidth: "3px",
+                    color: "#fde047",
+                    marginBottom: "2px",
+                    ...chromeTheme?.calculatorBannerStyle,
+                  }}
+                >
+                  {calculatorTopBanner}
+                </div>
               ) : null}
               <NumericKeypad
                 value={keypadValue}

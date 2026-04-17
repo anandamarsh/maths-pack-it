@@ -6,6 +6,14 @@ import { playKeyClick } from "../sound";
 const DISPLAY_FONT_SIZE = "2.1rem";
 const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
+function toOpaqueColor(color: string | undefined) {
+  if (!color) return color;
+  return color.replace(
+    /rgba\(\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/g,
+    "rgb($1,$2,$3)",
+  );
+}
+
 interface NumericKeypadProps {
   value: string;
   onChange?: (v: string) => void;
@@ -84,7 +92,7 @@ export default function NumericKeypad({
   };
   const width = isMobileLandscape ? "w-[16.25rem]" : "w-[12.5rem] md:w-[13.75rem]";
   const keypadPanelStyle: CSSProperties = {
-    background: theme?.panelBackground ?? "rgba(2,6,23,0.97)",
+    background: toOpaqueColor(theme?.panelBackground) ?? "rgb(2,6,23)",
     border: `4px solid ${theme?.panelBorder ?? "rgba(56,189,248,0.45)"}`,
     boxShadow:
       theme?.panelGlow ??

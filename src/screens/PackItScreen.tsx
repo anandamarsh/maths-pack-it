@@ -7,6 +7,7 @@ import GameLayout from "../components/GameLayout";
 import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import { getDemoConfig } from "../demoMode";
+import { useIsMobileLandscape } from "../hooks/useMediaQuery";
 import {
   ensureAudioReady,
   isMuted,
@@ -207,34 +208,29 @@ function renderHighlightedQuestion(
     symbol?: string;
   },
 ): ReactNode {
-  return text.split(/(\s+)/).map((part, index) => {
-    if (part.trim() === "") {
-      return (
-        <span key={`space-${index}`} style={{ whiteSpace: "pre" }}>
+  return text
+    .trim()
+    .split(/\s+/)
+    .map((part, index, parts) => (
+      <span key={`${part}-${index}`}>
+        <span
+          style={
+            isMathSymbolToken(part)
+              ? { color: colors?.symbol ?? "#86efac" }
+              : isNumericToken(part)
+                ? { color: QUESTION_KEYWORD_COLOR }
+                : isHighlightedToken(part)
+                  ? { color: colors?.highlight ?? "#facc15" }
+                  : colors?.normal
+                    ? { color: colors.normal }
+                    : undefined
+          }
+        >
           {part}
         </span>
-      );
-    }
-
-    return (
-      <span
-        key={`${part}-${index}`}
-        style={
-          isMathSymbolToken(part)
-            ? { color: colors?.symbol ?? "#86efac" }
-            : isNumericToken(part)
-              ? { color: QUESTION_KEYWORD_COLOR }
-              : isHighlightedToken(part)
-              ? { color: colors?.highlight ?? "#facc15" }
-              : colors?.normal
-                ? { color: colors.normal }
-                : undefined
-        }
-      >
-        {part}
+        {index < parts.length - 1 ? " " : null}
       </span>
-    );
-  });
+    ));
 }
 
 function DigitalCount({
@@ -1343,6 +1339,7 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
 
 export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
+  const isMobileLandscape = useIsMobileLandscape();
   const [roundName, setRoundName] = useState<RoundName>("load");
   const round = useMemo(() => makeRound(1, roundName), [roundName]);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -1462,11 +1459,49 @@ export default function PackItScreen() {
   const showAnswerBanner =
     !isQuestionDemo &&
     !isContinuousAutopilot &&
-    (import.meta.env.DEV || demoConfig.showAnswers || forceAnswerBanner);
+    !import.meta.env.DEV &&
+    (demoConfig.showAnswers || forceAnswerBanner);
   const chromeTheme = useMemo(
     () => getChromeTheme(question.pair.item, question.pair.palette),
     [question.pair.item, question.pair.palette],
   );
+  const layoutDensity =
+    question.totalA >= 18 || question.unitRate >= 9
+      ? 2
+      : question.totalA >= 14 || question.unitRate >= 6 || question.groupsA >= 3
+        ? 1
+        : 0;
+  const baseItemSizePx = isMobileLandscape ? 44 : 64;
+  const itemSizePx = Math.max(
+    isMobileLandscape ? 30 : 42,
+    baseItemSizePx - layoutDensity * (isMobileLandscape ? 6 : 10),
+  );
+  const itemFontSizePx = Math.round(itemSizePx * 0.72);
+  const itemTranslateY = isMobileLandscape ? "translateY(2px)" : "translateY(4px)";
+  const selectedItemTranslateY = isMobileLandscape ? "translateY(2px)" : "translateY(8px)";
+  const sourceGapPx = Math.max(6, Math.round(itemSizePx * (isMobileLandscape ? 0.2 : 0.24)));
+  const containerGapPx = Math.max(4, Math.round(itemSizePx * 0.16));
+  const sourcePaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
+  const sourcePaddingTop = Math.max(10, Math.round(itemSizePx * 0.25));
+  const containerColumnPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
+  const containerColumnPaddingTop = Math.max(2, Math.round(itemSizePx * 0.08));
+  const containerPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
+  const containerPaddingY = Math.max(4, Math.round(itemSizePx * 0.08));
+  const containerCounterOffset = Math.max(10, Math.round(itemSizePx * 0.25));
+  const containerItemsRightPadding = Math.max(6, Math.round(itemSizePx * 0.12));
+  const containerMinHeightPx = Math.max(itemSizePx + 14, Math.round(itemSizePx * 1.3));
+  const containerInnerMinHeightPx = Math.max(itemSizePx - 4, Math.round(itemSizePx * 0.9));
+  const lowerDividerStyle = isMobileLandscape
+    ? { top: "82%" }
+    : { bottom: "3.1rem" };
+  const lowerCountsStyle = isMobileLandscape
+    ? { top: "calc(84.5% + 0px)" }
+    : { bottom: "0.5rem" };
+  const itemBoxStyle = {
+    width: `${itemSizePx}px`,
+    height: `${itemSizePx}px`,
+    fontSize: `${itemFontSizePx}px`,
+  } as const;
   const calculatorTopBanner = showAnswerBanner ? (
     <span className="font-black tracking-[0.06em]">
       <span className="text-white">Answer:</span>{" "}
@@ -3840,13 +3875,21 @@ export default function PackItScreen() {
       <div
         className="flex h-full gap-0"
         style={{
-          height: calculatorMinimized ? "4.5rem" : undefined,
-          minHeight: calculatorMinimized ? "4.5rem" : "10.5rem",
+          height: calculatorMinimized
+            ? "4.5rem"
+            : isMobileLandscape
+              ? "100%"
+              : undefined,
+          minHeight: calculatorMinimized
+            ? "4.5rem"
+            : isMobileLandscape
+              ? "100%"
+              : "10.5rem",
           transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
         }}
       >
         <div
-          className="font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-[1.1rem] border-[3px]"
+          className="font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border-[3px]"
           style={{
             background: messageTheme.outerBackground,
             borderColor: messageTheme.outerBorder,
@@ -3854,7 +3897,11 @@ export default function PackItScreen() {
           }}
         >
           <div
-            className="flex cursor-pointer items-center px-5 text-[1.15rem] font-semibold leading-relaxed"
+            className={`block cursor-pointer px-5 font-semibold ${
+              isMobileLandscape
+                ? "text-[1rem] leading-snug"
+                : "text-[1.15rem] leading-relaxed"
+            }`}
             onClick={toggleCalculatorMinimized}
             style={{
               minHeight: calculatorMinimized ? "100%" : "4.25rem",
@@ -3864,6 +3911,10 @@ export default function PackItScreen() {
               letterSpacing: "0.015em",
               background: messageTheme.headerBackground,
               color: messageTheme.text,
+              whiteSpace: "normal",
+              overflowWrap: "normal",
+              wordBreak: "normal",
+              textAlign: "left",
             }}
           >
             {renderHighlightedQuestion(visibleQuestionText, {
@@ -3998,7 +4049,7 @@ export default function PackItScreen() {
                     );
                   })}
                 </div>
-                <div className="flex items-center justify-center gap-1.5">
+                <div className="mt-[4px] flex items-center justify-center gap-1.5">
                   {Array.from({ length: progressTotal }, (_, index) => {
                     const filled = index < autopilotProgress;
                     return (
@@ -4059,17 +4110,18 @@ export default function PackItScreen() {
                                 <div
                                   key={`grouping-preview-${itemId}`}
                                   aria-hidden="true"
-                                  className="pointer-events-none fixed z-[61] flex h-16 w-16 items-center justify-center text-[3.1rem] leading-none"
+                                  className="pointer-events-none fixed z-[61] flex items-center justify-center leading-none"
                                   style={{
                                     left: previewItem.left,
                                     top: previewItem.top,
                                     transform: previewItem.transform,
                                     transition:
                                       "transform 180ms cubic-bezier(0.22,0.72,0.2,1)",
+                                    ...itemBoxStyle,
                                   }}
                                 >
                                   <span
-                                    style={{ transform: "translateY(4px)" }}
+                                    style={{ transform: itemTranslateY }}
                                   >
                                     {question.pair.itemEmoji}
                                   </span>
@@ -4105,17 +4157,22 @@ export default function PackItScreen() {
                     style={{
                       left: "50%",
                       top: "15px",
-                      height: "96%",
+                      height: isMobileLandscape ? "90%" : "96%",
                       opacity: 0.2,
                     }}
                   />
                   <div
-                    className="pointer-events-none absolute left-0 right-0 z-[1] h-[2px] bg-white"
-                    style={{ top: "91%", opacity: 0.2 }}
+                    className="pointer-events-none absolute z-[1] h-[2px] bg-white"
+                    style={{
+                      left: "4px",
+                      right: "4px",
+                      opacity: 0.2,
+                      ...lowerDividerStyle,
+                    }}
                   />
                   <div
                     className="pointer-events-none absolute left-0 right-0 z-[2]"
-                    style={{ top: "calc(94.25% - 4px)" }}
+                    style={lowerCountsStyle}
                   >
                     <div className="grid grid-cols-2">
                       <div className="flex justify-center">
@@ -4130,10 +4187,18 @@ export default function PackItScreen() {
                   <div className="relative z-[3] grid h-full grid-cols-[50%_50%] gap-0 px-0 pb-0 pt-7">
                     <div
                       ref={sourceAreaRef}
-                      className="relative h-full bg-transparent pl-4 pr-4 pt-4"
-                      style={{ boxShadow: "none" }}
+                      className="relative h-full bg-transparent"
+                      style={{
+                        boxShadow: "none",
+                        paddingLeft: `${sourcePaddingX}px`,
+                        paddingRight: `${sourcePaddingX}px`,
+                        paddingTop: `${sourcePaddingTop}px`,
+                      }}
                     >
-                      <div className="flex min-h-[7rem] flex-wrap content-start justify-start gap-4">
+                      <div
+                        className="flex min-h-[7rem] flex-wrap content-start justify-start"
+                        style={{ gap: `${sourceGapPx}px` }}
+                      >
                         {items
                           .slice()
                           .sort((a, b) => a.id - b.id)
@@ -4149,8 +4214,9 @@ export default function PackItScreen() {
                                 onPointerDown={(event) =>
                                   handlePointerDown(item.id, event)
                                 }
-                                className="relative flex h-16 w-16 items-center justify-center rounded-full border-0 bg-transparent text-[3.1rem] outline-none transition-transform active:scale-95 focus:outline-none"
+                                className="relative flex items-center justify-center rounded-full border-0 bg-transparent outline-none transition-transform active:scale-95 focus:outline-none"
                                 style={{
+                                  ...itemBoxStyle,
                                   appearance: "none",
                                   WebkitAppearance: "none",
                                   boxShadow: "none",
@@ -4194,7 +4260,7 @@ export default function PackItScreen() {
                                   className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
                                   style={{
                                     transform: selectedItemIdSet.has(item.id)
-                                      ? "translateY(4px)"
+                                      ? itemTranslateY
                                       : undefined,
                                   }}
                                 >
@@ -4205,14 +4271,26 @@ export default function PackItScreen() {
                               <div
                                 key={item.id}
                                 aria-hidden="true"
-                                className="h-16 w-16 shrink-0"
+                                className="shrink-0"
+                                style={{
+                                  width: `${itemSizePx}px`,
+                                  height: `${itemSizePx}px`,
+                                }}
                               />
                             ),
                           )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 content-start gap-3 pl-4 pr-4 pt-1">
+                    <div
+                      className="grid grid-cols-1 content-start"
+                      style={{
+                        gap: `${containerGapPx}px`,
+                        paddingLeft: `${containerColumnPaddingX}px`,
+                        paddingRight: `${containerColumnPaddingX}px`,
+                        paddingTop: `${containerColumnPaddingTop}px`,
+                      }}
+                    >
                       {containers.map((containerItems, index) =>
                         (() => {
                           const isHovered =
@@ -4255,7 +4333,7 @@ export default function PackItScreen() {
                                   ? handleContainerPointerDown(index, event)
                                   : undefined
                               }
-                              className="relative min-h-[5rem] overflow-hidden rounded-[1.35rem] border-[3px] px-4 py-[0.35rem]"
+                              className="relative overflow-hidden rounded-[1.35rem] border-[3px]"
                               style={{
                                 borderColor,
                                 background: "transparent",
@@ -4265,9 +4343,17 @@ export default function PackItScreen() {
                                     ? "none"
                                     : "none",
                                 opacity: isDisabledBox ? 0.78 : 1,
+                                minHeight: `${containerMinHeightPx}px`,
+                                paddingLeft: `${containerPaddingX}px`,
+                                paddingRight: `${containerPaddingX}px`,
+                                paddingTop: `${containerPaddingY}px`,
+                                paddingBottom: `${containerPaddingY}px`,
                               }}
                             >
-                              <div className="pointer-events-none absolute right-4 top-1/2 z-[2] -translate-y-1/2">
+                              <div
+                                className="pointer-events-none absolute top-1/2 z-[2] -translate-y-1/2"
+                                style={{ right: `${containerCounterOffset}px` }}
+                              >
                                 <DigitalCount
                                   value={containerItems.length}
                                   color={counterColor}
@@ -4275,7 +4361,14 @@ export default function PackItScreen() {
                                   glowOuter={counterGlowOuter}
                                 />
                               </div>
-                              <div className="flex min-h-[3.15rem] max-w-[calc(100%-5.5rem)] flex-wrap items-center content-center justify-start gap-2 pr-2">
+                              <div
+                                className="flex max-w-[calc(100%-5.5rem)] flex-wrap items-center content-center justify-start"
+                                style={{
+                                  minHeight: `${containerInnerMinHeightPx}px`,
+                                  gap: `${containerGapPx}px`,
+                                  paddingRight: `${containerItemsRightPadding}px`,
+                                }}
+                              >
                                 {containerItems.map((item) => (
                                   <button
                                     key={item.id}
@@ -4289,8 +4382,9 @@ export default function PackItScreen() {
                                         ? handlePointerDown(item.id, event)
                                         : undefined
                                     }
-                                    className="relative flex h-16 w-16 items-center justify-center bg-transparent text-[3.1rem] leading-none"
+                                    className="relative flex items-center justify-center bg-transparent leading-none"
                                     style={{
+                                      ...itemBoxStyle,
                                       opacity:
                                         (dragState?.isLifted &&
                                           draggedItemIds.has(item.id)) ||
@@ -4323,8 +4417,8 @@ export default function PackItScreen() {
                                       className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
                                       style={{
                                         transform: selectedItemIdSet.has(item.id)
-                                          ? "translateY(8px)"
-                                          : "translateY(4px)",
+                                          ? selectedItemTranslateY
+                                          : itemTranslateY,
                                       }}
                                     >
                                       {question.pair.itemEmoji}
@@ -4362,11 +4456,12 @@ export default function PackItScreen() {
                       ).map((itemId) => (
                         <span
                           key={`drag-${itemId}`}
-                          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                          className="relative flex items-center justify-center rounded-full bg-transparent"
+                          style={itemBoxStyle}
                         >
                           <span
                             className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                            style={{ transform: "translateY(4px)" }}
+                            style={{ transform: itemTranslateY }}
                           >
                             {question.pair.itemEmoji}
                           </span>
@@ -4400,11 +4495,12 @@ export default function PackItScreen() {
                       ).map((itemId) => (
                         <span
                           key={`phantom-drag-${itemId}`}
-                          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                          className="relative flex items-center justify-center rounded-full bg-transparent"
+                          style={itemBoxStyle}
                         >
                           <span
                             className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                            style={{ transform: "translateY(4px)" }}
+                            style={{ transform: itemTranslateY }}
                           >
                             {question.pair.itemEmoji}
                           </span>
@@ -4417,11 +4513,12 @@ export default function PackItScreen() {
                     <div
                       key={`return-${returnState.itemId}`}
                       aria-hidden="true"
-                      className="pointer-events-none fixed z-[69] flex h-16 w-16 items-center justify-center rounded-full bg-transparent text-[3.1rem]"
+                      className="pointer-events-none fixed z-[69] flex items-center justify-center rounded-full bg-transparent"
                       style={{
                         left: returnState.x,
                         top: returnState.y,
                         transition: `left ${returnState.durationMs ?? 220}ms ease-out, top ${returnState.durationMs ?? 220}ms ease-out`,
+                        ...itemBoxStyle,
                       }}
                     >
                       <span

@@ -1,6 +1,9 @@
 import { pickPair, randInt } from "../shared.ts";
 import type { GroupingPair, PackQuestion, RoundConfig, RoundName } from "../types.ts";
 
+const MAX_TOTAL_COUNT = 20;
+const MAX_GROUP_COUNT = 3;
+
 function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -159,12 +162,13 @@ export function createLevelOneQuestion(
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
   const pair = pickPair(usedPairs, random);
-  const groups = round === "load"
-    ? randInt(2, 4, random)
-    : randInt(4, 5, random);
-  const unit = round === "load"
-    ? randInt(2, 6, random)
-    : randInt(3, 8, random);
+  const groups = randInt(2, MAX_GROUP_COUNT, random);
+  const minUnit = round === "load" ? 2 : 3;
+  const maxUnit = Math.min(
+    round === "load" ? 6 : 8,
+    Math.floor(MAX_TOTAL_COUNT / groups),
+  );
+  const unit = randInt(minUnit, maxUnit, random);
   const total = groups * unit;
   const templateIndex = pickQuestionTemplateIndex(previousTemplateIndex, random);
   const questionText = LEVEL_ONE_LOAD_QUESTION_TEMPLATES[templateIndex](
