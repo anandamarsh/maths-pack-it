@@ -1475,6 +1475,7 @@ export default function PackItScreen() {
   const progressTotal = isContinuousAutopilot
     ? AUTOPILOT_QUESTION_COUNT
     : QUESTION_COUNT;
+  const showDevCaptureControls = import.meta.env.DEV;
   const showAnswerBanner =
     !isQuestionDemo &&
     !isContinuousAutopilot &&
@@ -4298,10 +4299,10 @@ export default function PackItScreen() {
         }
         onKeypadChange={handleCalculatorChange}
         onKeypadKeyInput={handleCalculatorKeyInput}
-        onCapture={handleCapture}
-        onToggleSquareSnip={toggleSquareSnip}
-        squareSnipActive={snipMode}
-        onRecordDemo={handleRecordDemo}
+        onCapture={showDevCaptureControls ? handleCapture : undefined}
+        onToggleSquareSnip={showDevCaptureControls ? toggleSquareSnip : undefined}
+        squareSnipActive={showDevCaptureControls && snipMode}
+        onRecordDemo={showDevCaptureControls ? handleRecordDemo : undefined}
         isRecordingDemo={isRecordingDemo}
         onQuestionDemo={solveCurrentQuestion}
         isQuestionDemo={isQuestionDemo}
