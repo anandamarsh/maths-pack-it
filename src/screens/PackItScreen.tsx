@@ -4098,8 +4098,8 @@ export default function PackItScreen() {
               }
               className={`arcade-button absolute right-2 z-[2] inline-flex items-center rounded-full font-arcade font-bold leading-none text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${
                 calculatorMinimized
-                  ? "bottom-2 active:scale-[0.98]"
-                  : "top-1/2 -translate-y-1/2 active:scale-[0.98]"
+                  ? "top-1/2 -translate-y-1/2 active:scale-[0.98]"
+                  : "bottom-2 active:scale-[0.98]"
               } ${
                 isMobile
                   ? isMobileLandscape
@@ -4163,7 +4163,7 @@ export default function PackItScreen() {
             onPointerCancel={handlePointerUp}
             style={{ touchAction: "none" }}
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center pt-[4px]">
               <div className="pointer-events-auto flex flex-col items-center gap-0">
                 <div className="inline-flex items-center gap-2 rounded-full px-2 py-1">
                   {(["load", "pack", "ship"] as const).map((candidateRound) => {
