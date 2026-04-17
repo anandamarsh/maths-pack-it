@@ -46,4 +46,5 @@ export interface RoundGenerationProfile {
   minTotalCount: number;
   maxTotalCount: number;
   maxGroupCount: number;
+  maxUnitCount: number;
 }

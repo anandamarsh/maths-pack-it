@@ -8,15 +8,17 @@ import type {
 } from "../types.ts";
 
 const MOBILE_ROUND_PROFILE: RoundGenerationProfile = {
-  minTotalCount: 10,
-  maxTotalCount: 30,
-  maxGroupCount: 3,
+  minTotalCount: 20,
+  maxTotalCount: 80,
+  maxGroupCount: 8,
+  maxUnitCount: 10,
 };
 
 const DESKTOP_ROUND_PROFILE: RoundGenerationProfile = {
-  minTotalCount: 40,
-  maxTotalCount: 100,
-  maxGroupCount: 10,
+  minTotalCount: 20,
+  maxTotalCount: 80,
+  maxGroupCount: 8,
+  maxUnitCount: 10,
 };
 
 function getLevelOneRoundProfile(isMobile: boolean): RoundGenerationProfile {
@@ -182,12 +184,19 @@ export function createLevelOneQuestion(
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
   const pair = pickPair(usedPairs, random);
-  const groups = randInt(2, profile.maxGroupCount, random);
+  const minGroups = Math.max(
+    2,
+    Math.ceil(profile.minTotalCount / profile.maxUnitCount),
+  );
+  const groups = randInt(minGroups, profile.maxGroupCount, random);
   const minUnit = round === "load" ? 2 : 3;
   const minUnitFromTotal = Math.max(minUnit, Math.ceil(profile.minTotalCount / groups));
-  const maxUnit = Math.min(
-    round === "load" ? 6 : 8,
-    Math.floor(profile.maxTotalCount / groups),
+  const maxUnit = Math.max(
+    minUnitFromTotal,
+    Math.min(
+      profile.maxUnitCount,
+      Math.floor(profile.maxTotalCount / groups),
+    ),
   );
   const unit = randInt(minUnitFromTotal, maxUnit, random);
   const total = groups * unit;
@@ -246,67 +255,121 @@ function createLevelOneRound(
 }
 
 export function createLevelOneLoadQuestion(
-  isMobile = false,
-  usedPairs: GroupingPair[] = [],
-  random: () => number = Math.random,
+  isMobileOrUsedPairs: boolean | GroupingPair[] = false,
+  usedPairsOrRandom: GroupingPair[] | (() => number) = [],
+  randomOrPreviousTemplateIndex: (() => number) | number | null = Math.random,
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
+  const isMobile = typeof isMobileOrUsedPairs === "boolean" ? isMobileOrUsedPairs : false;
+  const usedPairs = Array.isArray(isMobileOrUsedPairs)
+    ? isMobileOrUsedPairs
+    : Array.isArray(usedPairsOrRandom)
+      ? usedPairsOrRandom
+      : [];
+  const random = typeof usedPairsOrRandom === "function"
+    ? usedPairsOrRandom
+    : typeof randomOrPreviousTemplateIndex === "function"
+      ? randomOrPreviousTemplateIndex
+      : Math.random;
+  const resolvedPreviousTemplateIndex =
+    typeof randomOrPreviousTemplateIndex === "number"
+      ? randomOrPreviousTemplateIndex
+      : previousTemplateIndex;
   return createLevelOneQuestion(
     "load",
     getLevelOneRoundProfile(isMobile),
     usedPairs,
     random,
-    previousTemplateIndex,
+    resolvedPreviousTemplateIndex,
   );
 }
 
 export function createLevelOnePackQuestion(
-  isMobile = false,
-  usedPairs: GroupingPair[] = [],
-  random: () => number = Math.random,
+  isMobileOrUsedPairs: boolean | GroupingPair[] = false,
+  usedPairsOrRandom: GroupingPair[] | (() => number) = [],
+  randomOrPreviousTemplateIndex: (() => number) | number | null = Math.random,
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
+  const isMobile = typeof isMobileOrUsedPairs === "boolean" ? isMobileOrUsedPairs : false;
+  const usedPairs = Array.isArray(isMobileOrUsedPairs)
+    ? isMobileOrUsedPairs
+    : Array.isArray(usedPairsOrRandom)
+      ? usedPairsOrRandom
+      : [];
+  const random = typeof usedPairsOrRandom === "function"
+    ? usedPairsOrRandom
+    : typeof randomOrPreviousTemplateIndex === "function"
+      ? randomOrPreviousTemplateIndex
+      : Math.random;
+  const resolvedPreviousTemplateIndex =
+    typeof randomOrPreviousTemplateIndex === "number"
+      ? randomOrPreviousTemplateIndex
+      : previousTemplateIndex;
   return createLevelOneQuestion(
     "pack",
     getLevelOneRoundProfile(isMobile),
     usedPairs,
     random,
-    previousTemplateIndex,
+    resolvedPreviousTemplateIndex,
   );
 }
 
 export function createLevelOneShipQuestion(
-  isMobile = false,
-  usedPairs: GroupingPair[] = [],
-  random: () => number = Math.random,
+  isMobileOrUsedPairs: boolean | GroupingPair[] = false,
+  usedPairsOrRandom: GroupingPair[] | (() => number) = [],
+  randomOrPreviousTemplateIndex: (() => number) | number | null = Math.random,
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
+  const isMobile = typeof isMobileOrUsedPairs === "boolean" ? isMobileOrUsedPairs : false;
+  const usedPairs = Array.isArray(isMobileOrUsedPairs)
+    ? isMobileOrUsedPairs
+    : Array.isArray(usedPairsOrRandom)
+      ? usedPairsOrRandom
+      : [];
+  const random = typeof usedPairsOrRandom === "function"
+    ? usedPairsOrRandom
+    : typeof randomOrPreviousTemplateIndex === "function"
+      ? randomOrPreviousTemplateIndex
+      : Math.random;
+  const resolvedPreviousTemplateIndex =
+    typeof randomOrPreviousTemplateIndex === "number"
+      ? randomOrPreviousTemplateIndex
+      : previousTemplateIndex;
   return createLevelOneQuestion(
     "ship",
     getLevelOneRoundProfile(isMobile),
     usedPairs,
     random,
-    previousTemplateIndex,
+    resolvedPreviousTemplateIndex,
   );
 }
 
 export function createLevelOneLoadRound(
-  isMobile = false,
+  isMobileOrRandom: boolean | (() => number) = false,
   random: () => number = Math.random,
 ): RoundConfig {
-  return createLevelOneRound("load", getLevelOneRoundProfile(isMobile), random);
+  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
+  const resolvedRandom =
+    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
+  return createLevelOneRound("load", getLevelOneRoundProfile(isMobile), resolvedRandom);
 }
 
 export function createLevelOnePackRound(
-  isMobile = false,
+  isMobileOrRandom: boolean | (() => number) = false,
   random: () => number = Math.random,
 ): RoundConfig {
-  return createLevelOneRound("pack", getLevelOneRoundProfile(isMobile), random);
+  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
+  const resolvedRandom =
+    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
+  return createLevelOneRound("pack", getLevelOneRoundProfile(isMobile), resolvedRandom);
 }
 
 export function createLevelOneShipRound(
-  isMobile = false,
+  isMobileOrRandom: boolean | (() => number) = false,
   random: () => number = Math.random,
 ): RoundConfig {
-  return createLevelOneRound("ship", getLevelOneRoundProfile(isMobile), random);
+  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
+  const resolvedRandom =
+    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
+  return createLevelOneRound("ship", getLevelOneRoundProfile(isMobile), resolvedRandom);
 }

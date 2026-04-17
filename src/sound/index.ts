@@ -94,9 +94,9 @@ export function ensureAudioReady() {
 
 export function playRipple(pitch: number = 440) {
   const t = ac().currentTime;
-  tone(pitch, t, 0.18, 0.09, "sine");
-  tone(pitch * 1.5, t + 0.04, 0.12, 0.05, "triangle");
-  noiseBurst(t, 1200, 0.06, 0.04);
+  tone(pitch, t, 0.28, 0.09, "sine");
+  tone(pitch * 1.5, t + 0.06, 0.18, 0.05, "triangle");
+  noiseBurst(t, 1200, 0.06, 0.08);
 }
 
 export function playCorrect() {

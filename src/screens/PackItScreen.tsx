@@ -7,7 +7,10 @@ import GameLayout from "../components/GameLayout";
 import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import { getDemoConfig } from "../demoMode";
-import { useIsCoarsePointer, useIsMobileLandscape } from "../hooks/useMediaQuery";
+import {
+  useIsCoarsePointer,
+  useIsMobileLandscape,
+} from "../hooks/useMediaQuery";
 import {
   ensureAudioReady,
   isMuted,
@@ -36,6 +39,7 @@ type DragState = {
   origin: "source" | "container";
   comboId: number | null;
   isLifted: boolean;
+  isSnappedToContainers: boolean;
   x: number;
   y: number;
   pointerOffsetX: number;
@@ -1342,7 +1346,10 @@ export default function PackItScreen() {
   const isMobileLandscape = useIsMobileLandscape();
   const isMobile = useIsCoarsePointer();
   const [roundName, setRoundName] = useState<RoundName>("load");
-  const round = useMemo(() => makeRound(1, roundName, isMobile), [isMobile, roundName]);
+  const round = useMemo(
+    () => makeRound(1, roundName, isMobile),
+    [isMobile, roundName],
+  );
   const [questionIndex, setQuestionIndex] = useState(0);
   const [items, setItems] = useState<PackedItem[]>(() =>
     buildInitialItems(round.questions[0]),
@@ -1475,10 +1482,21 @@ export default function PackItScreen() {
     () => getChromeTheme(question.pair.item, question.pair.palette),
     [question.pair.item, question.pair.palette],
   );
+  const containerBorderColor = chromeTheme.questionBoxStyle.borderColor;
+  const containerBorderGlow = [
+    `-10px 12px 16px -12px ${question.pair.palette}88`,
+    `10px 12px 16px -12px ${question.pair.palette}88`,
+    `0 14px 18px -14px ${question.pair.palette}88`,
+  ].join(", ");
   const itemSizePx = isMobile ? 32 : 48;
   const itemFontSizePx = Math.round(itemSizePx * 0.72);
-  const itemTranslateY = isMobileLandscape ? "translateY(2px)" : "translateY(4px)";
-  const sourceGapPx = Math.max(6, Math.round(itemSizePx * (isMobileLandscape ? 0.2 : 0.24)));
+  const itemTranslateY = isMobileLandscape
+    ? "translateY(2px)"
+    : "translateY(4px)";
+  const sourceGapPx = Math.max(
+    6,
+    Math.round(itemSizePx * (isMobileLandscape ? 0.2 : 0.24)),
+  );
   const containerGapPx = Math.max(4, Math.round(itemSizePx * 0.16));
   const sourcePaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
   const sourcePaddingTop = Math.max(10, Math.round(itemSizePx * 0.25));
@@ -1486,16 +1504,27 @@ export default function PackItScreen() {
   const containerColumnPaddingTop = Math.max(2, Math.round(itemSizePx * 0.08));
   const containerPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
   const containerPaddingY = Math.max(4, Math.round(itemSizePx * 0.08));
-  const containerCounterOffset = Math.max(10, Math.round(itemSizePx * 0.25));
-  const containerItemsRightPadding = Math.max(6, Math.round(itemSizePx * 0.12));
-  const containerMinHeightPx = Math.max(itemSizePx + 14, Math.round(itemSizePx * 1.3));
-  const containerInnerMinHeightPx = Math.max(itemSizePx - 4, Math.round(itemSizePx * 0.9));
-  const lowerDividerStyle = isMobileLandscape
-    ? { top: "82%" }
-    : { bottom: "3.1rem" };
+  const containerStackGapPx = 8;
+  const containerStackStepPx = itemSizePx + containerStackGapPx;
+  const containerInnerMinHeightPx =
+    itemSizePx + Math.max(0, question.unitRate - 1) * containerStackStepPx;
+  const containerMinHeightPx = 520;
+  const containerWidthPx = Math.max(
+    itemSizePx + containerPaddingX * 2,
+    Math.round(itemSizePx * 1.9),
+  );
+  const containerStripGapPx = Math.max(18, Math.round(itemSizePx * 0.8));
+  const containerStripBottomOffsetPx = 64;
+  const containerSnapZonePaddingPx = Math.max(
+    18,
+    Math.round(itemSizePx * 0.55),
+  );
+  const containerSnapOffsetXPx = 4;
+  const sourcePanelWidthPercent = 35;
+  const containerPanelWidthPercent = 65;
   const lowerCountsStyle = isMobileLandscape
-    ? { top: "calc(84.5% + 0px)" }
-    : { bottom: "0.5rem" };
+    ? { top: "calc(84.5% - 8px)" }
+    : { bottom: "calc(0.5rem + 6px)" };
   const itemBoxStyle = {
     width: `${itemSizePx}px`,
     height: `${itemSizePx}px`,
@@ -2083,7 +2112,9 @@ export default function PackItScreen() {
   }
 
   function clearAutopilotSfxTimers() {
-    autopilotSfxTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    autopilotSfxTimersRef.current.forEach((timer) =>
+      window.clearTimeout(timer),
+    );
     autopilotSfxTimersRef.current = [];
   }
 
@@ -2294,7 +2325,10 @@ export default function PackItScreen() {
     }
   }
 
-  function animateSingleItemToContainer(itemId: number, containerIndex: number) {
+  function animateSingleItemToContainer(
+    itemId: number,
+    containerIndex: number,
+  ) {
     const itemNode = itemRefs.current[itemId];
     const startCenter = getScreenCenter(itemNode);
 
@@ -2511,75 +2545,93 @@ export default function PackItScreen() {
     targetContainerIndexes: number[],
     comboId: number,
     startPosition?: { x: number; y: number },
+    options?: { alreadyExpanded?: boolean },
   ) {
-    const COLUMN_DROP_DELAY_MS = 80;
+    const COLUMN_DROP_DELAY_MS = 70;
+    const COLUMN_EXPAND_MS = 180;
     const COLUMN_DROP_TRAVEL_MS = 320;
-    const COLUMN_DROP_CLEANUP_MS = 360;
+    const COLUMN_DROP_CLEANUP_MS = 620;
+    const alreadyExpanded = options?.alreadyExpanded ?? false;
     const finalTopBoxCount = targetContainerIndexes.filter(
       (containerIndex) => containerIndex === 0,
     ).length;
-    lockDisplayTopBoxCount(finalTopBoxCount, COLUMN_DROP_DELAY_MS + COLUMN_DROP_TRAVEL_MS);
-    assignItems(itemIds, () => 0, comboId);
-
-    const trailingItemIds = itemIds.slice(1);
-    if (trailingItemIds.length === 0) {
-      return;
-    }
+    lockDisplayTopBoxCount(
+      finalTopBoxCount,
+      COLUMN_DROP_DELAY_MS +
+        (alreadyExpanded ? 0 : COLUMN_EXPAND_MS) +
+        COLUMN_DROP_TRAVEL_MS,
+    );
 
     window.setTimeout(() => {
-      const fallbackCenter = getScreenCenter(containerRefs.current[0]);
-      const startX =
-        startPosition?.x ?? (fallbackCenter ? fallbackCenter.x - 32 : 0);
-      const startY =
-        startPosition?.y ?? (fallbackCenter ? fallbackCenter.y - 32 : 0);
+      const snapPosition = getTopBoxLeadDropPosition();
+      const snapY = snapPosition?.y ?? startPosition?.y ?? 0;
+      const groupedStartX = startPosition?.x ?? snapPosition?.x ?? 0;
+      const groupedStartStates = itemIds.map((itemId, itemIndex) => ({
+        itemId,
+        x: groupedStartX + itemIndex * (itemSizePx + sourceGapPx),
+        y: snapY,
+        durationMs: COLUMN_EXPAND_MS,
+      }));
+      const expandedStates = itemIds.map((itemId, itemIndex) => {
+        const targetContainerRect =
+          containerRefs.current[
+            targetContainerIndexes[itemIndex] ?? 0
+          ]?.getBoundingClientRect();
+        const x = targetContainerRect
+          ? targetContainerRect.left +
+            targetContainerRect.width / 2 -
+            itemSizePx / 2 +
+            containerSnapOffsetXPx
+          : (startPosition?.x ?? 0);
 
-      setReturnStates(
-        trailingItemIds.map((itemId, trailingIndex) => ({
+        return {
           itemId,
-          x: startX + (trailingIndex + 1) * 72,
-          y: startY,
-          durationMs: COLUMN_DROP_TRAVEL_MS,
-        })),
-      );
+          x,
+          y: snapY,
+          durationMs: COLUMN_EXPAND_MS,
+        };
+      });
 
-      setItems((currentItems) =>
-        currentItems.map((item) => {
-          const itemIndex = itemIds.indexOf(item.id);
-          return itemIndex >= 1
-            ? {
-                ...item,
-                containerIndex: targetContainerIndexes[itemIndex] ?? 0,
-                comboId,
-              }
-            : item;
-        }),
+      assignItems(
+        itemIds,
+        (_, itemIndex) => targetContainerIndexes[itemIndex] ?? 0,
+        comboId,
       );
+      setReturnStates(alreadyExpanded ? expandedStates : groupedStartStates);
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setReturnStates(
-            trailingItemIds
-              .map((itemId) => {
-                const center = getScreenCenter(itemRefs.current[itemId]);
-                return center
-                  ? {
-                      itemId,
-                      x: center.x - 32,
-                      y: center.y - 32,
-                      durationMs: COLUMN_DROP_TRAVEL_MS,
-                    }
-                  : null;
-              })
-              .filter(
-                (
-                  state,
-                ): state is {
-                  itemId: number;
-                  x: number;
-                  y: number;
-                  durationMs: number;
-                } => state !== null,
-              ),
+          if (!alreadyExpanded) {
+            setReturnStates(expandedStates);
+          }
+          window.setTimeout(
+            () => {
+              setReturnStates(
+                itemIds
+                  .map((itemId) => {
+                    const center = getScreenCenter(itemRefs.current[itemId]);
+                    return center
+                      ? {
+                          itemId,
+                          x: center.x - 32 + 8,
+                          y: center.y - 32 + 12,
+                          durationMs: COLUMN_DROP_TRAVEL_MS,
+                        }
+                      : null;
+                  })
+                  .filter(
+                    (
+                      state,
+                    ): state is {
+                      itemId: number;
+                      x: number;
+                      y: number;
+                      durationMs: number;
+                    } => state !== null,
+                  ),
+              );
+            },
+            alreadyExpanded ? 0 : COLUMN_EXPAND_MS,
           );
         });
       });
@@ -2593,32 +2645,85 @@ export default function PackItScreen() {
     }, COLUMN_DROP_DELAY_MS);
   }
 
-  function getTopBoxLeadDropPosition(): { x: number; y: number } | null {
-    const topItems = getCurrentItemsInContainer(0);
-    const lastTopItem = topItems[topItems.length - 1];
-    const lastTopItemRect = lastTopItem
-      ? itemRefs.current[lastTopItem.id]?.getBoundingClientRect()
-      : null;
+  function getContainerStripRect() {
+    const rects = containerRefs.current
+      .map((node) => node?.getBoundingClientRect() ?? null)
+      .filter((rect): rect is DOMRect => rect !== null);
 
-    if (lastTopItemRect) {
-      return {
-        x: lastTopItemRect.left + lastTopItemRect.width + containerGapPx,
-        y: lastTopItemRect.top,
-      };
-    }
-
-    const topContainerRect = containerRefs.current[0]?.getBoundingClientRect();
-    if (!topContainerRect) {
+    if (rects.length === 0) {
       return null;
     }
 
     return {
-      x: topContainerRect.left + containerPaddingX,
-      y:
-        topContainerRect.top +
-        containerPaddingY +
-        Math.max(0, (containerInnerMinHeightPx - itemSizePx) / 2),
+      left: Math.min(...rects.map((rect) => rect.left)),
+      top: Math.min(...rects.map((rect) => rect.top)),
+      right: Math.max(...rects.map((rect) => rect.right)),
+      bottom: Math.max(...rects.map((rect) => rect.bottom)),
     };
+  }
+
+  function getContainerDropZoneRect() {
+    const sceneRect = captureSceneRef.current?.getBoundingClientRect();
+    const stripRect = getContainerStripRect();
+    if (!sceneRect || !stripRect) {
+      return null;
+    }
+
+    return {
+      left: sceneRect.left + (sceneRect.width * sourcePanelWidthPercent) / 100,
+      top: sceneRect.top,
+      right: sceneRect.right,
+      bottom: stripRect.bottom + containerSnapZonePaddingPx,
+    };
+  }
+
+  function isPointNearContainerStrip(x: number, y: number) {
+    const rect = getContainerDropZoneRect();
+    if (!rect) {
+      return false;
+    }
+
+    return (
+      x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+    );
+  }
+
+  function getTopBoxLeadDropPosition(): { x: number; y: number } | null {
+    const firstContainerRect =
+      containerRefs.current[0]?.getBoundingClientRect();
+    if (!firstContainerRect) {
+      return null;
+    }
+
+    return {
+      x:
+        firstContainerRect.left +
+        firstContainerRect.width / 2 -
+        itemSizePx / 2 +
+        containerSnapOffsetXPx,
+      y: firstContainerRect.top - itemSizePx - 16,
+    };
+  }
+
+  function getSnappedDragPreviewPositions(itemIds: number[]) {
+    const orderedIds = getAnchoredGroupItemIds(
+      dragState?.anchorItemId ?? itemIds[0] ?? 0,
+      itemIds,
+    );
+
+    return orderedIds.map((itemId, index) => {
+      const containerRect =
+        containerRefs.current[index]?.getBoundingClientRect();
+      return {
+        itemId,
+        x: containerRect
+          ? containerRect.left +
+            containerRect.width / 2 -
+            itemSizePx / 2 +
+            containerSnapOffsetXPx
+          : (dragState?.x ?? 0) + index * (itemSizePx + sourceGapPx),
+      };
+    });
   }
 
   function getGroupingPreviewFrame() {
@@ -2737,22 +2842,25 @@ export default function PackItScreen() {
           });
         }, timelineMs + KEY_MOVE_MS);
 
-        window.setTimeout(() => {
-          playKeyClick();
-          autopilotDisplayValue =
-            autopilotDisplayValue === "" || autopilotDisplayValue === "0"
-              ? digit
-              : autopilotDisplayValue === "-0"
-                ? `-${digit}`
-                : `${autopilotDisplayValue}${digit}`;
+        window.setTimeout(
+          () => {
+            playKeyClick();
+            autopilotDisplayValue =
+              autopilotDisplayValue === "" || autopilotDisplayValue === "0"
+                ? digit
+                : autopilotDisplayValue === "-0"
+                  ? `-${digit}`
+                  : `${autopilotDisplayValue}${digit}`;
 
-          if (roundName === "pack") {
-            handleCalculatorChange(autopilotDisplayValue);
-          } else {
-            setCalculatorOverride(true);
-            setCalculatorInput(autopilotDisplayValue);
-          }
-        }, timelineMs + KEY_MOVE_MS + KEY_PRESS_MS);
+            if (roundName === "pack") {
+              handleCalculatorChange(autopilotDisplayValue);
+            } else {
+              setCalculatorOverride(true);
+              setCalculatorInput(autopilotDisplayValue);
+            }
+          },
+          timelineMs + KEY_MOVE_MS + KEY_PRESS_MS,
+        );
 
         timelineMs += KEY_MOVE_MS + KEY_PRESS_MS + KEY_SETTLE_MS;
       });
@@ -2772,28 +2880,37 @@ export default function PackItScreen() {
         });
       }, timelineMs + POST_INPUT_SETTLE_MS);
 
-      window.setTimeout(() => {
-        setPhantomPos({
-          ...submitButtonCenter,
-          isClicking: true,
-          durationMs: 120,
-        });
-        playKeyClick();
-      }, timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS);
+      window.setTimeout(
+        () => {
+          setPhantomPos({
+            ...submitButtonCenter,
+            isClicking: true,
+            durationMs: 120,
+          });
+          playKeyClick();
+        },
+        timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS,
+      );
 
-      window.setTimeout(() => {
-        document
-          .querySelector<HTMLButtonElement>('[data-autopilot-key="submit"]')
-          ?.click();
-      }, timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS + KEY_PRESS_MS);
+      window.setTimeout(
+        () => {
+          document
+            .querySelector<HTMLButtonElement>('[data-autopilot-key="submit"]')
+            ?.click();
+        },
+        timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS + KEY_PRESS_MS,
+      );
 
-      window.setTimeout(() => {
-        setPhantomPos(null);
-        setIsQuestionDemo(false);
-        if (mode === "retry") {
-          setRevealCtaMode("retry");
-        }
-      }, timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS + KEY_PRESS_MS + 1600);
+      window.setTimeout(
+        () => {
+          setPhantomPos(null);
+          setIsQuestionDemo(false);
+          if (mode === "retry") {
+            setRevealCtaMode("retry");
+          }
+        },
+        timelineMs + POST_INPUT_SETTLE_MS + KEY_MOVE_MS + KEY_PRESS_MS + 1600,
+      );
 
       return;
     }
@@ -2945,48 +3062,55 @@ export default function PackItScreen() {
       }, index * DEMO_STEP_MS);
     });
 
-    window.setTimeout(() => {
-      const submitButtonCenter = getSubmitButtonCenter();
-      if (submitButtonCenter) {
-        setPhantomPos({
-          ...submitButtonCenter,
-          isClicking: false,
-          durationMs: 80,
-        });
-      }
-
-      window.setTimeout(() => {
+    window.setTimeout(
+      () => {
+        const submitButtonCenter = getSubmitButtonCenter();
         if (submitButtonCenter) {
           setPhantomPos({
             ...submitButtonCenter,
-            isClicking: true,
-            durationMs: 120,
+            isClicking: false,
+            durationMs: 80,
           });
         }
-        playKeyClick();
 
         window.setTimeout(() => {
-          setSelectedItemIds([]);
-          setTypedStepLengths([]);
-          setShowNextQuestionButton(false);
-          setPhantomPos(null);
-          setPhantomDragState(null);
-          setIsQuestionDemo(false);
-
-          const isCorrect = isCurrentBoardCorrect();
-
-          if (isCorrect) {
-            applyCorrectAnswerResult(mode === "retry" ? "retry" : "next");
-          } else {
-            setShowUnitReveal(false);
-            setQuestionSolved(false);
-            setFlash({ ok: false, icon: true });
-            markQuestionPenalty();
-            playWrong();
+          if (submitButtonCenter) {
+            setPhantomPos({
+              ...submitButtonCenter,
+              isClicking: true,
+              durationMs: 120,
+            });
           }
-        }, 180);
-      }, 1000);
-    }, Math.max(0, (comboAssignments.length - 1) * DEMO_STEP_MS + DEMO_FINAL_DROP_SETTLE_MS));
+          playKeyClick();
+
+          window.setTimeout(() => {
+            setSelectedItemIds([]);
+            setTypedStepLengths([]);
+            setShowNextQuestionButton(false);
+            setPhantomPos(null);
+            setPhantomDragState(null);
+            setIsQuestionDemo(false);
+
+            const isCorrect = isCurrentBoardCorrect();
+
+            if (isCorrect) {
+              applyCorrectAnswerResult(mode === "retry" ? "retry" : "next");
+            } else {
+              setShowUnitReveal(false);
+              setQuestionSolved(false);
+              setFlash({ ok: false, icon: true });
+              markQuestionPenalty();
+              playWrong();
+            }
+          }, 180);
+        }, 1000);
+      },
+      Math.max(
+        0,
+        (comboAssignments.length - 1) * DEMO_STEP_MS +
+          DEMO_FINAL_DROP_SETTLE_MS,
+      ),
+    );
   }
 
   function applyCorrectAnswerResult(revealMode: RevealCtaMode) {
@@ -3111,6 +3235,7 @@ export default function PackItScreen() {
       origin,
       comboId,
       isLifted: false,
+      isSnappedToContainers: false,
       x: rect.left,
       y: rect.top,
       pointerOffsetX: event.clientX - rect.left,
@@ -3133,17 +3258,8 @@ export default function PackItScreen() {
       return;
     }
 
-    const topContainer = containerRefs.current[0];
-    const hitIndex = topContainer
-      ? (() => {
-          const rect = topContainer.getBoundingClientRect();
-          return event.clientX >= rect.left &&
-            event.clientX <= rect.right &&
-            event.clientY >= rect.top &&
-            event.clientY <= rect.bottom
-            ? 0
-            : -1;
-        })()
+    const hitIndex = isPointNearContainerStrip(event.clientX, event.clientY)
+      ? 0
       : -1;
 
     const lastPoint = dragSoundPointRef.current;
@@ -3183,6 +3299,7 @@ export default function PackItScreen() {
           return {
             ...current,
             isLifted,
+            isSnappedToContainers: true,
             x: snapPosition.x,
             y: snapPosition.y,
           };
@@ -3192,6 +3309,7 @@ export default function PackItScreen() {
       return {
         ...current,
         isLifted,
+        isSnappedToContainers: false,
         x: event.clientX - current.pointerOffsetX,
         y: event.clientY - current.pointerOffsetY,
       };
@@ -3217,27 +3335,23 @@ export default function PackItScreen() {
         event.clientY <= sourceRect.bottom
       : false;
 
-    const topContainer = containerRefs.current[0];
-    const hitIndex = topContainer
-      ? (() => {
-          const rect = topContainer.getBoundingClientRect();
-          return event.clientX >= rect.left &&
-            event.clientX <= rect.right &&
-            event.clientY >= rect.top &&
-            event.clientY <= rect.bottom
-            ? 0
-            : -1;
-        })()
+    const hitIndex = isPointNearContainerStrip(event.clientX, event.clientY)
+      ? 0
       : -1;
 
     if (hitIndex >= 0) {
       if (dragState.origin === "source") {
         const comboId = dragState.comboId ?? nextComboIdRef.current;
-        stageComboIntoTopBox(
+        const orderedDragItemIds = getAnchoredGroupItemIds(
+          dragState.anchorItemId,
           dragState.itemIds,
-          dragState.itemIds.map((_, index) => index),
+        );
+        stageComboIntoTopBox(
+          orderedDragItemIds,
+          orderedDragItemIds.map((_, index) => index),
           comboId,
           { x: dragState.x, y: dragState.y },
+          { alreadyExpanded: dragState.isSnappedToContainers },
         );
         nextComboIdRef.current = comboId + 1;
         return;
@@ -3600,8 +3714,11 @@ export default function PackItScreen() {
       return false;
     }
 
-    return Array.from({ length: question.groupsA }, (_, containerIndex) =>
-      currentItems.filter((item) => item.containerIndex === containerIndex).length,
+    return Array.from(
+      { length: question.groupsA },
+      (_, containerIndex) =>
+        currentItems.filter((item) => item.containerIndex === containerIndex)
+          .length,
     ).every((count) => count === question.unitRate);
   }
 
@@ -3873,7 +3990,12 @@ export default function PackItScreen() {
     return () => {
       window.removeEventListener("keydown", handleNextButtonEnter);
     };
-  }, [goToNextQuestion, handleNowYourTurn, revealCtaMode, showNextQuestionButton]);
+  }, [
+    goToNextQuestion,
+    handleNowYourTurn,
+    revealCtaMode,
+    showNextQuestionButton,
+  ]);
 
   useEffect(() => {
     if (!isRoundComplete) {
@@ -3910,8 +4032,12 @@ export default function PackItScreen() {
         .map((line, index) => line.slice(0, typedStepLengths[index] ?? 0))
         .filter((line) => line.length > 0)
     : [];
-  const visibleQuestionText = question.questionText.slice(0, typedQuestionLength);
-  const nextRoundName = ROUND_SEQUENCE[ROUND_SEQUENCE.indexOf(roundName) + 1] ?? null;
+  const visibleQuestionText = question.questionText.slice(
+    0,
+    typedQuestionLength,
+  );
+  const nextRoundName =
+    ROUND_SEQUENCE[ROUND_SEQUENCE.indexOf(roundName) + 1] ?? null;
 
   function handleRoundCompleteContinue() {
     if (nextRoundName) {
@@ -3995,14 +4121,14 @@ export default function PackItScreen() {
               ? "100%"
               : isDesktopExpanded
                 ? "calc(100% - 0.4rem)"
-              : undefined,
+                : undefined,
           minHeight: calculatorMinimized
             ? "4.5rem"
             : isMobileLandscape
               ? "100%"
               : isDesktopExpanded
                 ? "calc(100% - 0.4rem)"
-              : "10.5rem",
+                : "10.5rem",
           marginTop: isDesktopExpanded ? "0.4rem" : undefined,
           transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
         }}
@@ -4092,9 +4218,7 @@ export default function PackItScreen() {
               ref={nextQuestionButtonRef}
               type="button"
               onClick={
-                revealCtaMode === "retry"
-                  ? handleNowYourTurn
-                  : goToNextQuestion
+                revealCtaMode === "retry" ? handleNowYourTurn : goToNextQuestion
               }
               className={`arcade-button absolute right-2 z-[2] inline-flex items-center rounded-full font-arcade font-bold leading-none text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${
                 calculatorMinimized
@@ -4154,619 +4278,678 @@ export default function PackItScreen() {
             isMobileLandscape && !calculatorMinimized;
 
           return (
-          <div
-            ref={rootRef}
-            data-pack-it-capture-root="true"
-            className="h-full w-full overflow-hidden bg-transparent"
-            onPointerDownCapture={ensureAudioReady}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            style={{ touchAction: "none" }}
-          >
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center pt-[4px]">
-              <div className="pointer-events-auto flex flex-col items-center gap-0">
-                <div className="inline-flex items-center gap-2 rounded-full px-2 py-1">
-                  {(["load", "pack", "ship"] as const).map((candidateRound) => {
-                    const isActive = candidateRound === roundName;
-                    return (
-                      <button
-                        key={candidateRound}
-                        type="button"
-                        onClick={() => handleRoundChange(candidateRound)}
-                        className="rounded-full border-[3px] px-3 py-1 font-arcade text-[0.8rem] font-bold uppercase tracking-[0.08em] text-white transition-all duration-150 hover:scale-[1.03] active:scale-[0.98]"
-                        style={{
-                          borderColor: isActive ? "#67e8f9" : "rgba(100,116,139,0.7)",
-                          background: isActive ? "rgba(8,47,73,0.96)" : "rgba(15,23,42,0.78)",
-                          color: isActive ? "#67e8f9" : "#e2e8f0",
-                          boxShadow: isActive ? "0 0 16px rgba(103,232,249,0.24)" : "none",
-                        }}
-                      >
-                        {ROUND_LABELS[candidateRound]}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-[4px] flex items-center justify-center gap-1.5">
-                  {Array.from({ length: progressTotal }, (_, index) => {
-                    const filled = index < autopilotProgress;
-                    return (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => handleDevProgressDotClick(index)}
-                        disabled={!import.meta.env.DEV}
-                        className="h-3.5 w-3.5 rounded-full border-2 transition-all duration-300 disabled:cursor-default"
-                        style={{
-                          background: filled ? "#67e8f9" : "transparent",
-                          borderColor: filled ? "#67e8f9" : "rgba(255,255,255,0.26)",
-                          boxShadow: filled ? "0 0 8px rgba(103,232,249,0.8)" : undefined,
-                          transform: filled ? "scale(1.15)" : "scale(1)",
-                          cursor: import.meta.env.DEV ? "pointer" : "default",
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
             <div
-              className="flex h-full flex-col px-0 pb-0 pt-[3.6rem]"
-              style={{
-                opacity: hideSceneForExpandedMobileKeypad ? 0 : 1,
-                pointerEvents: hideSceneForExpandedMobileKeypad
-                  ? "none"
-                  : "auto",
-                visibility: hideSceneForExpandedMobileKeypad
-                  ? "hidden"
-                  : "visible",
-              }}
+              ref={rootRef}
+              data-pack-it-capture-root="true"
+              className="h-full w-full overflow-hidden bg-transparent"
+              onPointerDownCapture={ensureAudioReady}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              style={{ touchAction: "none" }}
             >
-              <div className="relative flex-1 overflow-hidden bg-transparent">
-                <div
-                  ref={captureSceneRef}
-                  className="absolute inset-0 bg-transparent"
-                  data-pack-it-capture-root="true"
-                >
-                  {renderSceneAtmosphere(question.pair.item)}
-                  {(() => {
-                    const previewFrame = getGroupingPreviewFrame();
-                    return previewFrame ? (
-                      <>
-                        <div
-                          aria-hidden="true"
-                          className="pointer-events-none fixed z-[60] rounded-full"
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center pt-[4px]">
+                <div className="pointer-events-auto flex flex-col items-center gap-0">
+                  <div className="inline-flex items-center gap-2 rounded-full px-2 py-1">
+                    {(["load", "pack", "ship"] as const).map(
+                      (candidateRound) => {
+                        const isActive = candidateRound === roundName;
+                        return (
+                          <button
+                            key={candidateRound}
+                            type="button"
+                            onClick={() => handleRoundChange(candidateRound)}
+                            className="rounded-full border-[3px] px-3 py-1 font-arcade text-[0.8rem] font-bold uppercase tracking-[0.08em] text-white transition-all duration-150 hover:scale-[1.03] active:scale-[0.98]"
+                            style={{
+                              borderColor: isActive
+                                ? "#67e8f9"
+                                : "rgba(100,116,139,0.7)",
+                              background: isActive
+                                ? "rgba(8,47,73,0.96)"
+                                : "rgba(15,23,42,0.78)",
+                              color: isActive ? "#67e8f9" : "#e2e8f0",
+                              boxShadow: isActive
+                                ? "0 0 16px rgba(103,232,249,0.24)"
+                                : "none",
+                            }}
+                          >
+                            {ROUND_LABELS[candidateRound]}
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
+                  <div className="mt-[4px] flex items-center justify-center gap-1.5">
+                    {Array.from({ length: progressTotal }, (_, index) => {
+                      const filled = index < autopilotProgress;
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => handleDevProgressDotClick(index)}
+                          disabled={!import.meta.env.DEV}
+                          className="h-3.5 w-3.5 rounded-full border-2 transition-all duration-300 disabled:cursor-default"
                           style={{
-                            left: previewFrame.left,
-                            top: previewFrame.top,
-                            width: previewFrame.width,
-                            height: previewFrame.height,
-                            boxShadow:
-                              "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                            background: "rgba(28,25,23,0.94)",
-                            transition:
-                              "width 180ms cubic-bezier(0.22,0.72,0.2,1), left 180ms cubic-bezier(0.22,0.72,0.2,1), top 180ms cubic-bezier(0.22,0.72,0.2,1)",
+                            background: filled ? "#67e8f9" : "transparent",
+                            borderColor: filled
+                              ? "#67e8f9"
+                              : "rgba(255,255,255,0.26)",
+                            boxShadow: filled
+                              ? "0 0 8px rgba(103,232,249,0.8)"
+                              : undefined,
+                            transform: filled ? "scale(1.15)" : "scale(1)",
+                            cursor: import.meta.env.DEV ? "pointer" : "default",
                           }}
                         />
-                        {groupingAnchorItemId !== null
-                          ? getAnchoredGroupItemIds(
-                              groupingAnchorItemId,
-                              selectedItemIds,
-                            ).map((itemId) => {
-                              const previewItem =
-                                getGroupingPreviewItemState(itemId);
-                              return previewItem ? (
-                                <div
-                                  key={`grouping-preview-${itemId}`}
-                                  aria-hidden="true"
-                                  className="pointer-events-none fixed z-[61] flex items-center justify-center leading-none"
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div
+                className="flex h-full flex-col px-0 pb-0 pt-[3.6rem]"
+                style={{
+                  opacity: hideSceneForExpandedMobileKeypad ? 0 : 1,
+                  pointerEvents: hideSceneForExpandedMobileKeypad
+                    ? "none"
+                    : "auto",
+                  visibility: hideSceneForExpandedMobileKeypad
+                    ? "hidden"
+                    : "visible",
+                }}
+              >
+                <div className="relative flex-1 overflow-hidden bg-transparent">
+                  <div
+                    ref={captureSceneRef}
+                    className="absolute inset-0 bg-transparent"
+                    data-pack-it-capture-root="true"
+                  >
+                    {renderSceneAtmosphere(question.pair.item)}
+                    {(() => {
+                      const previewFrame = getGroupingPreviewFrame();
+                      return previewFrame ? (
+                        <>
+                          <div
+                            aria-hidden="true"
+                            className="pointer-events-none fixed z-[60] rounded-full"
+                            style={{
+                              left: previewFrame.left,
+                              top: previewFrame.top,
+                              width: previewFrame.width,
+                              height: previewFrame.height,
+                              boxShadow:
+                                "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                              background: "none",
+                              backgroundColor: "transparent",
+                              backgroundImage: "none",
+                              transition:
+                                "width 180ms cubic-bezier(0.22,0.72,0.2,1), left 180ms cubic-bezier(0.22,0.72,0.2,1), top 180ms cubic-bezier(0.22,0.72,0.2,1)",
+                            }}
+                          />
+                          {groupingAnchorItemId !== null
+                            ? getAnchoredGroupItemIds(
+                                groupingAnchorItemId,
+                                selectedItemIds,
+                              ).map((itemId) => {
+                                const previewItem =
+                                  getGroupingPreviewItemState(itemId);
+                                return previewItem ? (
+                                  <div
+                                    key={`grouping-preview-${itemId}`}
+                                    aria-hidden="true"
+                                    className="pointer-events-none fixed z-[61] flex items-center justify-center leading-none"
+                                    style={{
+                                      left: previewItem.left,
+                                      top: previewItem.top,
+                                      transform: previewItem.transform,
+                                      transition:
+                                        "transform 180ms cubic-bezier(0.22,0.72,0.2,1)",
+                                      ...itemBoxStyle,
+                                    }}
+                                  >
+                                    <span style={{ transform: itemTranslateY }}>
+                                      {question.pair.itemEmoji}
+                                    </span>
+                                  </div>
+                                ) : null;
+                              })
+                            : null}
+                        </>
+                      ) : null;
+                    })()}
+                    {false ? (
+                      <div
+                        className="pointer-events-none absolute left-1/2 z-[8] -translate-x-1/2"
+                        style={{ top: "-0.75rem" }}
+                      >
+                        <button
+                          type="button"
+                          className="pointer-events-auto rounded-full border-[3px] border-yellow-300 bg-slate-900 px-6 py-2 font-arcade text-[1rem] font-bold text-yellow-200"
+                          style={{
+                            boxShadow:
+                              "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
+                          }}
+                          onClick={() => {
+                            animateItemsBackToSource();
+                          }}
+                        >
+                          Now you try it
+                        </button>
+                      </div>
+                    ) : null}
+                    <div
+                      className="pointer-events-none absolute left-0 right-0 z-[2]"
+                      style={lowerCountsStyle}
+                    >
+                      <div className="flex">
+                        <div
+                          className="flex justify-center"
+                          style={{ width: `${sourcePanelWidthPercent}%` }}
+                        >
+                          <DigitalCount value={remainingItems.length} />
+                        </div>
+                        <div
+                          className="flex justify-center"
+                          style={{ width: `${containerPanelWidthPercent}%` }}
+                        >
+                          <DigitalCount value={packedItemsTotal} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="relative z-[3] grid h-full gap-0 px-0 pb-0 pt-7"
+                      style={{
+                        gridTemplateColumns: `${sourcePanelWidthPercent}% ${containerPanelWidthPercent}%`,
+                      }}
+                    >
+                      <div
+                        ref={sourceAreaRef}
+                        className="relative h-full bg-transparent"
+                        style={{
+                          boxShadow: "none",
+                          paddingLeft: `${sourcePaddingX}px`,
+                          paddingRight: `${sourcePaddingX}px`,
+                          paddingTop: `${sourcePaddingTop}px`,
+                        }}
+                      >
+                        <div
+                          className="flex min-h-[7rem] flex-wrap content-start justify-start"
+                          style={{ gap: `${sourceGapPx}px` }}
+                        >
+                          {items
+                            .slice()
+                            .sort((a, b) => a.id - b.id)
+                            .map((item) =>
+                              item.containerIndex === null ? (
+                                <button
+                                  key={item.id}
+                                  ref={(node) => {
+                                    itemRefs.current[item.id] = node;
+                                  }}
+                                  type="button"
+                                  aria-label={`${question.pair.item} ${item.id + 1}`}
+                                  onPointerDown={(event) =>
+                                    handlePointerDown(item.id, event)
+                                  }
+                                  className="relative flex items-center justify-center rounded-full border-0 bg-transparent outline-none transition-transform active:scale-95 focus:outline-none"
                                   style={{
-                                    left: previewItem.left,
-                                    top: previewItem.top,
-                                    transform: previewItem.transform,
-                                    transition:
-                                      "transform 180ms cubic-bezier(0.22,0.72,0.2,1)",
                                     ...itemBoxStyle,
+                                    appearance: "none",
+                                    WebkitAppearance: "none",
+                                    boxShadow: "none",
+                                    touchAction: "none",
+                                    zIndex:
+                                      selectedItemIdSet.has(item.id) &&
+                                      isGroupingPreviewActive
+                                        ? 61
+                                        : undefined,
+                                    opacity:
+                                      (dragState?.isLifted &&
+                                        draggedItemIds.has(item.id)) ||
+                                      (phantomDragState &&
+                                        selectedItemIdSet.has(item.id)) ||
+                                      (isGroupingPreviewActive &&
+                                        selectedItemIdSet.has(item.id)) ||
+                                      returningItemIds.has(item.id)
+                                        ? 0
+                                        : 1,
+                                    pointerEvents:
+                                      revealCtaMode === "retry" ||
+                                      isQuestionDemo ||
+                                      isTapFillRound
+                                        ? "none"
+                                        : "auto",
                                   }}
                                 >
                                   <span
+                                    className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                                    style={{
+                                      transform: selectedItemIdSet.has(item.id)
+                                        ? itemTranslateY
+                                        : undefined,
+                                    }}
+                                  >
+                                    {question.pair.itemEmoji}
+                                  </span>
+                                </button>
+                              ) : (
+                                <div
+                                  key={item.id}
+                                  aria-hidden="true"
+                                  className="shrink-0"
+                                  style={{
+                                    width: `${itemSizePx}px`,
+                                    height: `${itemSizePx}px`,
+                                  }}
+                                />
+                              ),
+                            )}
+                        </div>
+                      </div>
+
+                      <div
+                        className="flex items-end justify-center"
+                        style={{
+                          gap: `${containerStripGapPx}px`,
+                          paddingLeft: `${containerColumnPaddingX}px`,
+                          paddingRight: `${containerColumnPaddingX}px`,
+                          paddingTop: `${containerColumnPaddingTop}px`,
+                          paddingBottom: `${containerStripBottomOffsetPx}px`,
+                        }}
+                      >
+                        {containers.map((containerItems, index) =>
+                          (() => {
+                            return (
+                              <div
+                                key={`${questionIndex}-${index}`}
+                                ref={(node) => {
+                                  containerRefs.current[index] = node;
+                                }}
+                                onPointerDown={(event) =>
+                                  isTapFillRound
+                                    ? handleContainerPointerDown(index, event)
+                                    : undefined
+                                }
+                                className="relative overflow-visible"
+                                style={{
+                                  borderLeft: `3px solid ${containerBorderColor}`,
+                                  borderRight: `3px solid ${containerBorderColor}`,
+                                  borderBottom: `3px solid ${containerBorderColor}`,
+                                  borderTop: "0",
+                                  borderTopLeftRadius: "0",
+                                  borderTopRightRadius: "0",
+                                  borderBottomLeftRadius: "2.4rem",
+                                  borderBottomRightRadius: "2.4rem",
+                                  background: `linear-gradient(180deg, rgba(255,255,255,0.14) 0%, ${question.pair.palette}22 22%, rgba(15,23,42,0.12) 58%, rgba(2,6,23,0.22) 100%)`,
+                                  boxShadow: containerBorderGlow,
+                                  opacity: 1,
+                                  width: `${containerWidthPx}px`,
+                                  minHeight: `${containerMinHeightPx}px`,
+                                  paddingLeft: `${containerPaddingX}px`,
+                                  paddingRight: `${containerPaddingX}px`,
+                                  paddingTop: `${containerPaddingY}px`,
+                                  paddingBottom: `${containerPaddingY}px`,
+                                  backdropFilter: "blur(2px)",
+                                }}
+                              >
+                                <div
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute -left-[12px] -top-[10px]"
+                                  style={{
+                                    width: "12px",
+                                    height: "14px",
+                                    borderRight: `3px solid ${containerBorderColor}`,
+                                    borderTop: `3px solid ${containerBorderColor}`,
+                                    borderTopRightRadius: "14px",
+                                    boxShadow: `-4px -2px 8px -8px ${question.pair.palette}aa`,
+                                    opacity: 0.95,
+                                  }}
+                                />
+                                <div
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute -right-[12px] -top-[10px]"
+                                  style={{
+                                    width: "12px",
+                                    height: "14px",
+                                    borderLeft: `3px solid ${containerBorderColor}`,
+                                    borderTop: `3px solid ${containerBorderColor}`,
+                                    borderTopLeftRadius: "14px",
+                                    boxShadow: `4px -2px 8px -8px ${question.pair.palette}aa`,
+                                    opacity: 0.95,
+                                  }}
+                                />
+                                <div
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute inset-y-3 left-[10%] w-[18%] rounded-full"
+                                  style={{
+                                    background:
+                                      "linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.03))",
+                                    opacity: 0.8,
+                                  }}
+                                />
+                                <div
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute inset-x-3 bottom-3 rounded-b-[2rem]"
+                                  style={{
+                                    height: "18%",
+                                    background: `linear-gradient(180deg, ${question.pair.palette}18, ${question.pair.palette}30)`,
+                                    opacity: 0.7,
+                                  }}
+                                />
+                                <div
+                                  className="absolute inset-x-0 flex items-end justify-center"
+                                  style={{
+                                    width: "100%",
+                                    minHeight: `${containerInnerMinHeightPx}px`,
+                                    bottom: `${containerPaddingY}px`,
+                                  }}
+                                >
+                                  {containerItems.map((item, stackIndex) => (
+                                    <button
+                                      key={item.id}
+                                      ref={(node) => {
+                                        itemRefs.current[item.id] = node;
+                                      }}
+                                      type="button"
+                                      aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
+                                      onPointerDown={(event) =>
+                                        handlePointerDown(item.id, event)
+                                      }
+                                      className="absolute left-0 flex items-center justify-center bg-transparent leading-none"
+                                      style={{
+                                        ...itemBoxStyle,
+                                        left: `calc(50% - ${itemSizePx / 2}px)`,
+                                        bottom: `${stackIndex * containerStackStepPx}px`,
+                                        touchAction: "none",
+                                        zIndex: stackIndex + 1,
+                                        opacity:
+                                          (dragState?.isLifted &&
+                                            draggedItemIds.has(item.id)) ||
+                                          returningItemIds.has(item.id)
+                                            ? 0
+                                            : 1,
+                                        pointerEvents:
+                                          revealCtaMode === "retry" ||
+                                          isQuestionDemo ||
+                                          isTapFillRound
+                                            ? "none"
+                                            : "auto",
+                                      }}
+                                    >
+                                      <span
+                                        className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                                        style={{ transform: itemTranslateY }}
+                                      >
+                                        {question.pair.itemEmoji}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })(),
+                        )}
+                      </div>
+                    </div>
+
+                    {dragState?.isLifted
+                      ? (() => {
+                          const previewPositions =
+                            dragState.isSnappedToContainers
+                              ? getSnappedDragPreviewPositions(
+                                  dragState.itemIds,
+                                )
+                              : getAnchoredGroupItemIds(
+                                  dragState.anchorItemId,
+                                  dragState.itemIds,
+                                ).map((itemId, index) => ({
+                                  itemId,
+                                  x:
+                                    dragState.x +
+                                    index *
+                                      (itemSizePx +
+                                        (dragState.origin === "container"
+                                          ? containerGapPx
+                                          : sourceGapPx)),
+                                }));
+                          const minX = Math.min(
+                            ...previewPositions.map((position) => position.x),
+                          );
+                          const maxX = Math.max(
+                            ...previewPositions.map((position) => position.x),
+                          );
+                          const gapPx =
+                            dragState.origin === "container"
+                              ? containerGapPx
+                              : sourceGapPx;
+
+                          return (
+                            <div
+                              aria-hidden="true"
+                              className="pointer-events-none fixed z-[70] rounded-full"
+                              style={{
+                                left: minX - gapPx * 0.5,
+                                top: dragState.y,
+                                width: maxX - minX + itemSizePx + gapPx,
+                                height: itemSizePx,
+                                background: "none",
+                                backgroundColor: "transparent",
+                                backgroundImage: "none",
+                                transition: dragState.isSnappedToContainers
+                                  ? "left 180ms cubic-bezier(0.22,0.72,0.2,1), top 180ms cubic-bezier(0.22,0.72,0.2,1), width 180ms cubic-bezier(0.22,0.72,0.2,1)"
+                                  : undefined,
+                              }}
+                            >
+                            <span
+                              className="pointer-events-none absolute inset-0 rounded-full"
+                              style={{
+                                boxShadow:
+                                  "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                                background: "none",
+                                backgroundColor: "transparent",
+                                backgroundImage: "none",
+                              }}
+                            />
+                              {previewPositions.map(({ itemId, x }) => (
+                                <span
+                                  key={`drag-${itemId}`}
+                                  className="absolute flex items-center justify-center rounded-full bg-transparent"
+                                  style={{
+                                    ...itemBoxStyle,
+                                    left: x - minX + gapPx * 0.5,
+                                    top: 0,
+                                    transition: dragState.isSnappedToContainers
+                                      ? "left 180ms cubic-bezier(0.22,0.72,0.2,1)"
+                                      : undefined,
+                                  }}
+                                >
+                                  <span
+                                    className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
                                     style={{ transform: itemTranslateY }}
                                   >
                                     {question.pair.itemEmoji}
                                   </span>
-                                </div>
-                              ) : null;
-                            })
-                          : null}
-                      </>
-                    ) : null;
-                  })()}
-                  {false ? (
-                    <div
-                      className="pointer-events-none absolute left-1/2 z-[8] -translate-x-1/2"
-                      style={{ top: "-0.75rem" }}
-                    >
-                      <button
-                        type="button"
-                        className="pointer-events-auto rounded-full border-[3px] border-yellow-300 bg-slate-900 px-6 py-2 font-arcade text-[1rem] font-bold text-yellow-200"
-                        style={{
-                          boxShadow:
-                            "0 0 16px rgba(250,204,21,0.22), 0 8px 18px rgba(2,6,23,0.35)",
-                        }}
-                        onClick={() => {
-                          animateItemsBackToSource();
-                        }}
-                      >
-                        Now you try it
-                      </button>
-                    </div>
-                  ) : null}
-                  <div
-                    className="pointer-events-none absolute z-[1] w-[2px] bg-white"
-                    style={{
-                      left: "50%",
-                      top: "15px",
-                      height: isMobileLandscape ? "90%" : "96%",
-                      opacity: 0.2,
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute z-[1] h-[2px] bg-white"
-                    style={{
-                      left: "4px",
-                      right: "4px",
-                      opacity: 0.2,
-                      ...lowerDividerStyle,
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute left-0 right-0 z-[2]"
-                    style={lowerCountsStyle}
-                  >
-                    <div className="grid grid-cols-2">
-                      <div className="flex justify-center">
-                        <DigitalCount value={remainingItems.length} />
-                      </div>
-                      <div className="flex justify-center">
-                        <DigitalCount value={packedItemsTotal} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="relative z-[3] grid h-full grid-cols-[50%_50%] gap-0 px-0 pb-0 pt-7">
-                    <div
-                      ref={sourceAreaRef}
-                      className="relative h-full bg-transparent"
-                      style={{
-                        boxShadow: "none",
-                        paddingLeft: `${sourcePaddingX}px`,
-                        paddingRight: `${sourcePaddingX}px`,
-                        paddingTop: `${sourcePaddingTop}px`,
-                      }}
-                    >
-                      <div
-                        className="flex min-h-[7rem] flex-wrap content-start justify-start"
-                        style={{ gap: `${sourceGapPx}px` }}
-                      >
-                        {items
-                          .slice()
-                          .sort((a, b) => a.id - b.id)
-                          .map((item) =>
-                            item.containerIndex === null ? (
-                              <button
-                                key={item.id}
-                                ref={(node) => {
-                                  itemRefs.current[item.id] = node;
-                                }}
-                                type="button"
-                                aria-label={`${question.pair.item} ${item.id + 1}`}
-                                onPointerDown={(event) =>
-                                  handlePointerDown(item.id, event)
-                                }
-                                className="relative flex items-center justify-center rounded-full border-0 bg-transparent outline-none transition-transform active:scale-95 focus:outline-none"
-                                style={{
-                                  ...itemBoxStyle,
-                                  appearance: "none",
-                                  WebkitAppearance: "none",
-                                  boxShadow: "none",
-                                  touchAction: "none",
-                                  zIndex:
-                                    selectedItemIdSet.has(item.id) &&
-                                    isGroupingPreviewActive
-                                      ? 61
-                                      : undefined,
-                                  opacity:
-                                    (dragState?.isLifted &&
-                                      draggedItemIds.has(item.id)) ||
-                                    (phantomDragState &&
-                                      selectedItemIdSet.has(item.id)) ||
-                                    (isGroupingPreviewActive &&
-                                      selectedItemIdSet.has(item.id)) ||
-                                    returningItemIds.has(item.id)
-                                      ? 0
-                                      : 1,
-                                  pointerEvents:
-                                    revealCtaMode === "retry" ||
-                                    isQuestionDemo ||
-                                    isTapFillRound
-                                      ? "none"
-                                      : "auto",
-                                }}
-                              >
-                                {selectedItemIdSet.has(item.id) &&
-                                !dragState?.isLifted &&
-                                !phantomDragState &&
-                                !isGroupingPreviewActive ? (
-                                  <span
-                                    className="pointer-events-none absolute inset-0 rounded-full"
-                                    style={{
-                                      boxShadow:
-                                        "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                                      transform: "translateY(0px)",
-                                    }}
-                                  />
-                                ) : null}
-                                <span
-                                  className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                                  style={{
-                                    transform: selectedItemIdSet.has(item.id)
-                                      ? itemTranslateY
-                                      : undefined,
-                                  }}
-                                >
-                                  {question.pair.itemEmoji}
                                 </span>
-                              </button>
-                            ) : (
-                              <div
-                                key={item.id}
-                                aria-hidden="true"
-                                className="shrink-0"
-                                style={{
-                                  width: `${itemSizePx}px`,
-                                  height: `${itemSizePx}px`,
-                                }}
-                              />
-                            ),
-                          )}
-                      </div>
-                    </div>
-
-                    <div
-                      className="grid grid-cols-1 content-start"
-                      style={{
-                        gap: `${containerGapPx}px`,
-                        paddingLeft: `${containerColumnPaddingX}px`,
-                        paddingRight: `${containerColumnPaddingX}px`,
-                        paddingTop: `${containerColumnPaddingTop}px`,
-                      }}
-                    >
-                      {containers.map((containerItems, index) =>
-                        (() => {
-                          const isDisabledBox = index !== 0;
-                          const borderColor = isDisabledBox
-                            ? "rgba(100,116,139,0.4)"
-                            : "#475569";
-                          const counterColor = "#67e8f9";
-                          const counterGlow = "rgba(103,232,249,0.72)";
-                          const counterGlowOuter = "rgba(56,189,248,0.26)";
-
-                          return (
-                            <div
-                              key={`${questionIndex}-${index}`}
-                              ref={(node) => {
-                                containerRefs.current[index] = node;
-                              }}
-                              onPointerDown={(event) =>
-                                isTapFillRound
-                                  ? handleContainerPointerDown(index, event)
-                                  : undefined
-                              }
-                              className="relative overflow-hidden rounded-[1.35rem] border-[3px]"
-                              style={{
-                                borderColor,
-                                background: "transparent",
-                                boxShadow: "none",
-                                opacity: isDisabledBox ? 0.78 : 1,
-                                minHeight: `${containerMinHeightPx}px`,
-                                paddingLeft: `${containerPaddingX}px`,
-                                paddingRight: `${containerPaddingX}px`,
-                                paddingTop: `${containerPaddingY}px`,
-                                paddingBottom: `${containerPaddingY}px`,
-                              }}
-                            >
-                              <div
-                                className="pointer-events-none absolute top-1/2 z-[2] -translate-y-1/2"
-                                style={{ right: `${containerCounterOffset}px` }}
-                              >
-                                <DigitalCount
-                                  value={containerItems.length}
-                                  color={counterColor}
-                                  glow={counterGlow}
-                                  glowOuter={counterGlowOuter}
-                                />
-                              </div>
-                              <div
-                                className="flex max-w-[calc(100%-5.5rem)] flex-wrap items-center content-center justify-start"
-                                style={{
-                                  minHeight: `${containerInnerMinHeightPx}px`,
-                                  gap: `${containerGapPx}px`,
-                                  paddingRight: `${containerItemsRightPadding}px`,
-                                }}
-                              >
-                                {containerItems.map((item) => (
-                                  <button
-                                    key={item.id}
-                                    ref={(node) => {
-                                      itemRefs.current[item.id] = node;
-                                    }}
-                                    type="button"
-                                    aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
-                                    onPointerDown={(event) =>
-                                      index === 0
-                                        ? handlePointerDown(item.id, event)
-                                        : undefined
-                                    }
-                                    className="relative flex items-center justify-center bg-transparent leading-none"
-                                    style={{
-                                      ...itemBoxStyle,
-                                      touchAction: "none",
-                                      opacity:
-                                        (dragState?.isLifted &&
-                                          draggedItemIds.has(item.id)) ||
-                                        returningItemIds.has(item.id)
-                                          ? 0
-                                          : isDisabledBox
-                                            ? 0.65
-                                            : 1,
-                                  pointerEvents:
-                                        revealCtaMode === "retry" ||
-                                        isQuestionDemo ||
-                                        index !== 0 ||
-                                        isTapFillRound
-                                          ? "none"
-                                          : "auto",
-                                    }}
-                                  >
-                                    {selectedItemIdSet.has(item.id) &&
-                                    !dragState?.isLifted ? (
-                                      <span
-                                        className="pointer-events-none absolute inset-0 rounded-full"
-                                        style={{
-                                          boxShadow:
-                                            "0 0 0 3px rgba(250,204,21,0.82), 0 0 0 8px rgba(250,204,21,0.14), 0 0 14px rgba(250,204,21,0.2)",
-                                          transform: "translateY(0px)",
-                                        }}
-                                      />
-                                    ) : null}
-                                    <span
-                                      className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                                      style={{ transform: itemTranslateY }}
-                                    >
-                                      {question.pair.itemEmoji}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
+                              ))}
                             </div>
                           );
-                        })(),
-                      )}
-                    </div>
+                        })()
+                      : null}
+
+                    {phantomDragState ? (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none fixed z-[190] flex items-center rounded-full"
+                        style={{
+                          left: phantomDragState.x,
+                          top: phantomDragState.y,
+                          gap: `${sourceGapPx}px`,
+                          background: "none",
+                          backgroundColor: "transparent",
+                          backgroundImage: "none",
+                          transition:
+                            "left 920ms ease-in-out, top 920ms ease-in-out",
+                        }}
+                      >
+                        <span
+                          className="pointer-events-none absolute inset-y-0 -inset-x-2 rounded-full"
+                          style={{
+                            boxShadow:
+                              "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                            background: "none",
+                            backgroundColor: "transparent",
+                            backgroundImage: "none",
+                          }}
+                        />
+                        {getAnchoredGroupItemIds(
+                          phantomDragState.anchorItemId,
+                          phantomDragState.itemIds,
+                        ).map((itemId) => (
+                          <span
+                            key={`phantom-drag-${itemId}`}
+                            className="relative flex items-center justify-center rounded-full bg-transparent"
+                            style={itemBoxStyle}
+                          >
+                            <span
+                              className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                              style={{ transform: itemTranslateY }}
+                            >
+                              {question.pair.itemEmoji}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {returnStates.map((returnState) => (
+                      <div
+                        key={`return-${returnState.itemId}`}
+                        aria-hidden="true"
+                        className="pointer-events-none fixed z-[69] flex items-center justify-center rounded-full bg-transparent"
+                        style={{
+                          left: returnState.x,
+                          top: returnState.y,
+                          transition: `left ${returnState.durationMs ?? 220}ms cubic-bezier(0.22,0.72,0.2,1), top ${returnState.durationMs ?? 220}ms cubic-bezier(0.22,0.72,0.2,1)`,
+                          ...itemBoxStyle,
+                        }}
+                      >
+                        <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                          {question.pair.itemEmoji}
+                        </span>
+                      </div>
+                    ))}
                   </div>
 
-                  {dragState?.isLifted ? (
+                  {snipMode ? (
                     <div
-                      aria-hidden="true"
-                      className="pointer-events-none fixed z-[70] flex items-center rounded-full bg-transparent"
-                      style={{
-                        left: dragState.x,
-                        top: dragState.y,
-                        gap: `${dragState.origin === "container" ? containerGapPx : sourceGapPx}px`,
-                      }}
+                      className="pointer-events-auto absolute inset-0 z-[82]"
+                      data-capture-ignore="true"
                     >
-                      <span
-                        className="pointer-events-none absolute inset-y-0 -inset-x-2 rounded-full"
+                      <div className="absolute inset-0 bg-black/10" />
+                      <div
+                        className="absolute rounded-2xl"
                         style={{
-                          boxShadow:
-                            "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                          background: "rgba(28,25,23,0.94)",
+                          left: snipSelection.x,
+                          top: snipSelection.y,
+                          width: snipSelection.size,
+                          height: snipSelection.size,
+                          border: "2px dashed rgba(255,255,255,0.95)",
+                          boxShadow: "0 0 0 9999px rgba(2,6,23,0.22)",
+                          background: "rgba(255,255,255,0.03)",
                         }}
-                      />
-                      {getAnchoredGroupItemIds(
-                        dragState.anchorItemId,
-                        dragState.itemIds,
-                      ).map((itemId) => (
-                        <span
-                          key={`drag-${itemId}`}
-                          className="relative flex items-center justify-center rounded-full bg-transparent"
-                          style={itemBoxStyle}
-                        >
-                          <span
-                            className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                            style={{ transform: itemTranslateY }}
-                          >
-                            {question.pair.itemEmoji}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {phantomDragState ? (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none fixed z-[190] flex items-center rounded-full bg-transparent"
-                      style={{
-                        left: phantomDragState.x,
-                        top: phantomDragState.y,
-                        gap: `${sourceGapPx}px`,
-                        transition:
-                          "left 920ms ease-in-out, top 920ms ease-in-out",
-                      }}
-                    >
-                      <span
-                        className="pointer-events-none absolute inset-y-0 -inset-x-2 rounded-full"
-                        style={{
-                          boxShadow:
-                            "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                          background: "rgba(28,25,23,0.94)",
-                        }}
-                      />
-                      {getAnchoredGroupItemIds(
-                        phantomDragState.anchorItemId,
-                        phantomDragState.itemIds,
-                      ).map((itemId) => (
-                        <span
-                          key={`phantom-drag-${itemId}`}
-                          className="relative flex items-center justify-center rounded-full bg-transparent"
-                          style={itemBoxStyle}
-                        >
-                          <span
-                            className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                            style={{ transform: itemTranslateY }}
-                          >
-                            {question.pair.itemEmoji}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {returnStates.map((returnState) => (
-                    <div
-                      key={`return-${returnState.itemId}`}
-                      aria-hidden="true"
-                      className="pointer-events-none fixed z-[69] flex items-center justify-center rounded-full bg-transparent"
-                      style={{
-                        left: returnState.x,
-                        top: returnState.y,
-                        transition: `left ${returnState.durationMs ?? 220}ms ease-out, top ${returnState.durationMs ?? 220}ms ease-out`,
-                        ...itemBoxStyle,
-                      }}
-                    >
-                      <span
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{
-                          boxShadow:
-                            "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                          transform: "translateY(-4px)",
-                        }}
-                      />
-                      <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
-                        {question.pair.itemEmoji}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {snipMode ? (
-                  <div
-                    className="pointer-events-auto absolute inset-0 z-[82]"
-                    data-capture-ignore="true"
-                  >
-                    <div className="absolute inset-0 bg-black/10" />
-                    <div
-                      className="absolute rounded-2xl"
-                      style={{
-                        left: snipSelection.x,
-                        top: snipSelection.y,
-                        width: snipSelection.size,
-                        height: snipSelection.size,
-                        border: "2px dashed rgba(255,255,255,0.95)",
-                        boxShadow: "0 0 0 9999px rgba(2,6,23,0.22)",
-                        background: "rgba(255,255,255,0.03)",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        title="Capture square snip"
-                        onClick={handleCaptureSnip}
-                        className="arcade-button absolute -left-3 -top-3 z-[2] h-10 w-10 p-1.5"
                       >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="h-full w-full"
+                        <button
+                          type="button"
+                          title="Capture square snip"
+                          onClick={handleCaptureSnip}
+                          className="arcade-button absolute -left-3 -top-3 z-[2] h-10 w-10 p-1.5"
                         >
-                          <path
-                            d="M7 7h2l1.2-2h3.6L15 7h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="h-full w-full"
+                          >
+                            <path
+                              d="M7 7h2l1.2-2h3.6L15 7h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"
+                              stroke="white"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <circle
+                              cx="12"
+                              cy="12.5"
+                              r="3.25"
+                              stroke="white"
+                              strokeWidth="2"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Close square snip"
+                          title="Close square snip"
+                          onClick={closeSnipMode}
+                          className="arcade-button absolute -right-3 -top-3 z-[2] flex h-10 w-10 items-center justify-center p-1.5"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="h-full w-full"
                             stroke="white"
-                            strokeWidth="2"
+                            strokeWidth="2.4"
                             strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <circle
-                            cx="12"
-                            cy="12.5"
-                            r="3.25"
-                            stroke="white"
-                            strokeWidth="2"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Close square snip"
-                        title="Close square snip"
-                        onClick={closeSnipMode}
-                        className="arcade-button absolute -right-3 -top-3 z-[2] flex h-10 w-10 items-center justify-center p-1.5"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="h-full w-full"
-                          stroke="white"
-                          strokeWidth="2.4"
-                          strokeLinecap="round"
-                        >
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Move square snip"
-                        title="Drag to move"
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          snipDragRef.current = {
-                            mode: "move",
-                            pointerId: event.pointerId,
-                            startX: event.clientX,
-                            startY: event.clientY,
-                            initial: snipSelection,
-                          };
-                        }}
-                        className="absolute inset-0 cursor-move rounded-2xl"
-                        style={{ background: "transparent" }}
-                      />
-                      <button
-                        type="button"
-                        aria-label="Resize square snip"
-                        title="Drag to resize"
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          snipDragRef.current = {
-                            mode: "resize",
-                            pointerId: event.pointerId,
-                            startX: event.clientX,
-                            startY: event.clientY,
-                            initial: snipSelection,
-                          };
-                        }}
-                        className="absolute -bottom-3 -right-3 z-[2] h-7 w-7 rounded-full border-2 border-white bg-sky-400/90"
-                        style={{ boxShadow: "0 0 18px rgba(56,189,248,0.45)" }}
-                      />
+                          >
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Move square snip"
+                          title="Drag to move"
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            snipDragRef.current = {
+                              mode: "move",
+                              pointerId: event.pointerId,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              initial: snipSelection,
+                            };
+                          }}
+                          className="absolute inset-0 cursor-move rounded-2xl"
+                          style={{ background: "transparent" }}
+                        />
+                        <button
+                          type="button"
+                          aria-label="Resize square snip"
+                          title="Drag to resize"
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            snipDragRef.current = {
+                              mode: "resize",
+                              pointerId: event.pointerId,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              initial: snipSelection,
+                            };
+                          }}
+                          className="absolute -bottom-3 -right-3 z-[2] h-7 w-7 rounded-full border-2 border-white bg-sky-400/90"
+                          style={{
+                            boxShadow: "0 0 18px rgba(56,189,248,0.45)",
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
-            </div>
 
-            <PhantomHand pos={phantomPos} />
-          </div>
+              <PhantomHand pos={phantomPos} />
+            </div>
           );
         }}
       />
@@ -4809,8 +4992,12 @@ export default function PackItScreen() {
                     className="h-4 w-4 rounded-full border-2"
                     style={{
                       background: filled ? "#67e8f9" : "transparent",
-                      borderColor: filled ? "#67e8f9" : "rgba(255,255,255,0.26)",
-                      boxShadow: filled ? "0 0 10px rgba(103,232,249,0.8)" : undefined,
+                      borderColor: filled
+                        ? "#67e8f9"
+                        : "rgba(255,255,255,0.26)",
+                      boxShadow: filled
+                        ? "0 0 10px rgba(103,232,249,0.8)"
+                        : undefined,
                     }}
                   />
                 );
@@ -4823,7 +5010,9 @@ export default function PackItScreen() {
                 onClick={handleRoundCompleteContinue}
                 className="arcade-button inline-flex h-12 items-center rounded-full px-6 font-arcade text-base font-bold uppercase tracking-[0.08em] text-white"
               >
-                {nextRoundName ? `Next: ${ROUND_LABELS[nextRoundName]}` : "Play Again"}
+                {nextRoundName
+                  ? `Next: ${ROUND_LABELS[nextRoundName]}`
+                  : "Play Again"}
               </button>
             </div>
           </div>

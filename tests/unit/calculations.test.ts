@@ -28,16 +28,16 @@ describe("Pack It calculations", () => {
         containerEmoji: "📦",
         palette: "#dc2626",
       },
-      totalA: 4,
+      totalA: 20,
       groupsA: 2,
-      unitRate: 2,
-      answer: 2,
+      unitRate: 10,
+      answer: 10,
       answerUnit: "apples per crate",
-      questionText: "There are 4 apples that have to be packed equally into 2 crates. How many shall each crate have?",
+      questionText: "There are 20 apples that have to be packed equally into 2 crates. How many shall each crate have?",
       blackboardSteps: [
-        "Total apples = 4.",
+        "Total apples = 20.",
         "Total crates = 2.",
-        "∴ Apples per crate = 4 ÷ 2 = 2.",
+        "∴ Apples per crate = 20 ÷ 2 = 10.",
       ],
       isFraction: false,
     });
@@ -52,10 +52,11 @@ describe("Pack It calculations", () => {
 
     for (const question of round.questions) {
       assert.equal(question.subtype, "find-unit");
-      assert.ok(question.groupsA >= 2 && question.groupsA <= 3);
-      assert.ok(question.unitRate >= 2 && question.unitRate <= 6);
+      assert.ok(question.groupsA >= 2 && question.groupsA <= 8);
+      assert.ok(question.unitRate >= 2 && question.unitRate <= 10);
       assert.equal(question.totalA, question.groupsA * question.unitRate);
-      assert.ok(question.totalA <= 20);
+      assert.ok(question.totalA >= 20);
+      assert.ok(question.totalA <= 80);
     }
   });
 
@@ -69,18 +70,20 @@ describe("Pack It calculations", () => {
     assert.ok(shipRound.questions.every((question) => question.round === "ship"));
   });
 
-  it("caps Level 1 Pack and Ship to three groups and twenty items", () => {
+  it("caps Level 1 Pack and Ship to ten items per container", () => {
     const packQuestion = createLevelOnePackQuestion([], () => 0.99);
     const shipQuestion = createLevelOneShipQuestion([], () => 0.99);
 
-    assert.ok(packQuestion.groupsA >= 2 && packQuestion.groupsA <= 3);
+    assert.ok(packQuestion.groupsA >= 2 && packQuestion.groupsA <= 8);
     assert.ok(packQuestion.unitRate >= 3);
-    assert.ok(packQuestion.unitRate <= 8);
-    assert.ok(packQuestion.totalA <= 20);
-    assert.ok(shipQuestion.groupsA >= 2 && shipQuestion.groupsA <= 3);
+    assert.ok(packQuestion.unitRate <= 10);
+    assert.ok(packQuestion.totalA >= 20);
+    assert.ok(packQuestion.totalA <= 80);
+    assert.ok(shipQuestion.groupsA >= 2 && shipQuestion.groupsA <= 8);
     assert.ok(shipQuestion.unitRate >= 3);
-    assert.ok(shipQuestion.unitRate <= 8);
-    assert.ok(shipQuestion.totalA <= 20);
+    assert.ok(shipQuestion.unitRate <= 10);
+    assert.ok(shipQuestion.totalA >= 20);
+    assert.ok(shipQuestion.totalA <= 80);
   });
 
   it("does not repeat the same Level 1 Load question wording twice in a row", () => {
@@ -108,7 +111,7 @@ describe("Pack It calculations", () => {
   it("dispatches the implemented round through the facade", () => {
     const round = createRound(1, "load", () => 0);
 
-    assert.equal(round.questions[0].answer, 2);
+    assert.equal(round.questions[0].answer, 10);
   });
 
   it("dispatches all implemented Level 1 rounds through the facade", () => {
