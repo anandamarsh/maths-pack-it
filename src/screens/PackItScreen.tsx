@@ -7,7 +7,7 @@ import GameLayout from "../components/GameLayout";
 import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import { getDemoConfig } from "../demoMode";
-import { useIsMobileLandscape } from "../hooks/useMediaQuery";
+import { useIsCoarsePointer, useIsMobileLandscape } from "../hooks/useMediaQuery";
 import {
   ensureAudioReady,
   isMuted,
@@ -1340,16 +1340,14 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
 export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
   const isMobileLandscape = useIsMobileLandscape();
+  const isMobile = useIsCoarsePointer();
   const [roundName, setRoundName] = useState<RoundName>("load");
-  const round = useMemo(() => makeRound(1, roundName), [roundName]);
+  const round = useMemo(() => makeRound(1, roundName, isMobile), [isMobile, roundName]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [items, setItems] = useState<PackedItem[]>(() =>
     buildInitialItems(round.questions[0]),
   );
   const [dragState, setDragState] = useState<DragState | null>(null);
-  const [hoveredContainerIndex, setHoveredContainerIndex] = useState<
-    number | null
-  >(null);
   const [returnStates, setReturnStates] = useState<ReturnState[]>([]);
   const [muted, setMuted] = useState(isMuted());
   const [showUnitReveal, setShowUnitReveal] = useState(false);
@@ -1390,11 +1388,13 @@ export default function PackItScreen() {
   const [isGroupingPreviewAnimating, setIsGroupingPreviewAnimating] =
     useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+  const [autoExpandCalculator, setAutoExpandCalculator] = useState(false);
   const nextComboIdRef = useRef(1);
   const containerRefs = useRef<Array<HTMLDivElement | null>>([]);
   const sourceAreaRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Record<number, HTMLButtonElement | null>>({});
   const nextQuestionButtonRef = useRef<HTMLButtonElement | null>(null);
+  const roundCompleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const musicStartedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const captureSceneRef = useRef<HTMLDivElement>(null);
@@ -1423,6 +1423,7 @@ export default function PackItScreen() {
   const captureFlashTimerRef = useRef<number | null>(null);
   const packHoldStartTimerRef = useRef<number | null>(null);
   const packHoldIntervalRef = useRef<number | null>(null);
+  const autoExpandCalculatorTimerRef = useRef<number | null>(null);
   const itemsRef = useRef<PackedItem[]>(items);
 
   const question = round.questions[questionIndex];
@@ -1436,6 +1437,16 @@ export default function PackItScreen() {
   const packedItemsTotal = items.length - remainingItems.length;
   const canSubmit = true;
   const score = round.questions.length - mistakeQuestionIndexes.length;
+  const solvedQuestionCount = questionIndex + (questionSolved ? 1 : 0);
+  const attemptedMistakeCount = mistakeQuestionIndexes.filter(
+    (index) => index < solvedQuestionCount,
+  ).length;
+  const roundCompletionTotal = isContinuousAutopilot
+    ? AUTOPILOT_QUESTION_COUNT
+    : round.questions.length;
+  const roundCompletionScore = isContinuousAutopilot
+    ? Math.max(0, solvedQuestionCount - attemptedMistakeCount)
+    : score;
   const returningItemIds = new Set(returnStates.map((state) => state.itemId));
   const draggedItemIds = new Set(dragState?.itemIds ?? []);
   const selectedItemIdSet = new Set(selectedItemIds);
@@ -1464,20 +1475,9 @@ export default function PackItScreen() {
     () => getChromeTheme(question.pair.item, question.pair.palette),
     [question.pair.item, question.pair.palette],
   );
-  const layoutDensity =
-    question.totalA >= 18 || question.unitRate >= 9
-      ? 2
-      : question.totalA >= 14 || question.unitRate >= 6 || question.groupsA >= 3
-        ? 1
-        : 0;
-  const baseItemSizePx = isMobileLandscape ? 44 : 64;
-  const itemSizePx = Math.max(
-    isMobileLandscape ? 30 : 42,
-    baseItemSizePx - layoutDensity * (isMobileLandscape ? 6 : 10),
-  );
+  const itemSizePx = isMobile ? 32 : 48;
   const itemFontSizePx = Math.round(itemSizePx * 0.72);
   const itemTranslateY = isMobileLandscape ? "translateY(2px)" : "translateY(4px)";
-  const selectedItemTranslateY = isMobileLandscape ? "translateY(2px)" : "translateY(8px)";
   const sourceGapPx = Math.max(6, Math.round(itemSizePx * (isMobileLandscape ? 0.2 : 0.24)));
   const containerGapPx = Math.max(4, Math.round(itemSizePx * 0.16));
   const sourcePaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
@@ -1511,6 +1511,42 @@ export default function PackItScreen() {
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  useEffect(() => {
+    return () => {
+      if (autoExpandCalculatorTimerRef.current !== null) {
+        window.clearTimeout(autoExpandCalculatorTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      remainingItems.length === 0 &&
+      !questionSolved &&
+      !showNextQuestionButton &&
+      !isQuestionDemo
+    ) {
+      if (autoExpandCalculatorTimerRef.current === null) {
+        autoExpandCalculatorTimerRef.current = window.setTimeout(() => {
+          autoExpandCalculatorTimerRef.current = null;
+          setAutoExpandCalculator(true);
+        }, 1000);
+      }
+      return;
+    }
+
+    if (autoExpandCalculatorTimerRef.current !== null) {
+      window.clearTimeout(autoExpandCalculatorTimerRef.current);
+      autoExpandCalculatorTimerRef.current = null;
+    }
+    setAutoExpandCalculator(false);
+  }, [
+    isQuestionDemo,
+    questionSolved,
+    remainingItems.length,
+    showNextQuestionButton,
+  ]);
 
   useEffect(() => {
     setItems(buildInitialItems(round.questions[0]));
@@ -1721,7 +1757,6 @@ export default function PackItScreen() {
     setShowUnitReveal(false);
     setQuestionSolved(false);
     setDragState(null);
-    setHoveredContainerIndex(null);
     setReturnStates([]);
     setPhantomPos(null);
     setPhantomDragState(null);
@@ -1829,7 +1864,6 @@ export default function PackItScreen() {
     setIsRoundComplete(false);
     setQuestionSolved(false);
     setDragState(null);
-    setHoveredContainerIndex(null);
     setReturnStates([]);
     setPhantomPos(null);
     setPhantomDragState(null);
@@ -1879,10 +1913,16 @@ export default function PackItScreen() {
     continuousAutopilotStartIndexRef.current = 0;
   }
 
-  function handleRoundChange(nextRound: RoundName) {
+  function handleRoundChange(
+    nextRound: RoundName,
+    options?: { preserveContinuousAutopilot?: boolean },
+  ) {
     if (nextRound === roundName) {
       return;
     }
+
+    const preserveContinuousAutopilot =
+      options?.preserveContinuousAutopilot ?? false;
 
     clearPackHoldTimers();
     setRoundName(nextRound);
@@ -1891,7 +1931,6 @@ export default function PackItScreen() {
     setIsRoundComplete(false);
     setQuestionSolved(false);
     setDragState(null);
-    setHoveredContainerIndex(null);
     setReturnStates([]);
     setPhantomPos(null);
     setPhantomDragState(null);
@@ -1910,7 +1949,7 @@ export default function PackItScreen() {
     setCalculatorOverride(false);
     setForceAnswerBanner(false);
     setIsCalculatorAdjusting(false);
-    setIsContinuousAutopilot(false);
+    setIsContinuousAutopilot(preserveContinuousAutopilot);
     setQuestionResetKey((current) => current + 1);
     dragSoundPointRef.current = null;
     nextComboIdRef.current = 1;
@@ -1943,7 +1982,6 @@ export default function PackItScreen() {
     setIsRoundComplete(false);
     setQuestionSolved(false);
     setDragState(null);
-    setHoveredContainerIndex(null);
     setReturnStates([]);
     setPhantomPos(null);
     setPhantomDragState(null);
@@ -2015,7 +2053,6 @@ export default function PackItScreen() {
       ),
     );
     setDragState(null);
-    setHoveredContainerIndex(null);
     setSelectedItemIds([]);
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
@@ -2557,7 +2594,6 @@ export default function PackItScreen() {
   }
 
   function getTopBoxLeadDropPosition(): { x: number; y: number } | null {
-    const DROP_TARGET_OFFSET_X = 30;
     const topItems = getCurrentItemsInContainer(0);
     const lastTopItem = topItems[topItems.length - 1];
     const lastTopItemRect = lastTopItem
@@ -2566,13 +2602,8 @@ export default function PackItScreen() {
 
     if (lastTopItemRect) {
       return {
-        x:
-          lastTopItemRect.left +
-          lastTopItemRect.width +
-          8 -
-          32 +
-          DROP_TARGET_OFFSET_X,
-        y: lastTopItemRect.top + lastTopItemRect.height / 2 - 32,
+        x: lastTopItemRect.left + lastTopItemRect.width + containerGapPx,
+        y: lastTopItemRect.top,
       };
     }
 
@@ -2582,8 +2613,11 @@ export default function PackItScreen() {
     }
 
     return {
-      x: topContainerRect.left + 18 + DROP_TARGET_OFFSET_X,
-      y: topContainerRect.top + topContainerRect.height / 2 - 32,
+      x: topContainerRect.left + containerPaddingX,
+      y:
+        topContainerRect.top +
+        containerPaddingY +
+        Math.max(0, (containerInnerMinHeightPx - itemSizePx) / 2),
     };
   }
 
@@ -2599,13 +2633,13 @@ export default function PackItScreen() {
     }
 
     return {
-      left: anchorRect.left - 8,
-      top: anchorRect.top + 4,
+      left: anchorRect.left - sourceGapPx / 2,
+      top: anchorRect.top,
       width:
-        selectedItemIds.length * 64 +
-        Math.max(0, selectedItemIds.length - 1) * 8 +
-        16,
-      height: 56,
+        selectedItemIds.length * itemSizePx +
+        Math.max(0, selectedItemIds.length - 1) * sourceGapPx +
+        sourceGapPx,
+      height: itemSizePx,
     };
   }
 
@@ -2630,7 +2664,7 @@ export default function PackItScreen() {
       return undefined;
     }
 
-    return `translate(${anchorRect.left + targetIndex * 72 - itemRect.left}px, ${anchorRect.top - itemRect.top}px)`;
+    return `translate(${anchorRect.left + targetIndex * (itemSizePx + sourceGapPx) - itemRect.left}px, ${anchorRect.top - itemRect.top}px)`;
   }
 
   function getGroupingPreviewItemState(itemId: number) {
@@ -3112,7 +3146,6 @@ export default function PackItScreen() {
         })()
       : -1;
 
-    setHoveredContainerIndex(hitIndex >= 0 ? hitIndex : null);
     const lastPoint = dragSoundPointRef.current;
     if (lastPoint) {
       const dx = event.clientX - lastPoint.x;
@@ -3228,7 +3261,6 @@ export default function PackItScreen() {
 
     setReturnStates(originStates.map(({ itemId, x, y }) => ({ itemId, x, y })));
     setDragState(null);
-    setHoveredContainerIndex(null);
     setSelectedItemIds([]);
     setGroupingAnchorItemId(null);
     setIsGroupingPreviewAnimating(false);
@@ -3593,7 +3625,6 @@ export default function PackItScreen() {
     setTypedStepLengths([]);
     setShowNextQuestionButton(false);
     setRevealCtaMode(null);
-    setHoveredContainerIndex(null);
 
     const startStates = packedItems
       .map((item) => {
@@ -3638,6 +3669,15 @@ export default function PackItScreen() {
   }
 
   function goToNextQuestion() {
+    if (
+      isContinuousAutopilot &&
+      solvedQuestionCount >= AUTOPILOT_QUESTION_COUNT
+    ) {
+      setIsRoundComplete(true);
+      playLevelComplete();
+      return;
+    }
+
     if (questionIndex === round.questions.length - 1) {
       setIsRoundComplete(true);
       playLevelComplete();
@@ -3653,7 +3693,6 @@ export default function PackItScreen() {
     setShowNextQuestionButton(false);
     setRevealCtaMode(null);
     setDragState(null);
-    setHoveredContainerIndex(null);
     setReturnStates([]);
     setPhantomPos(null);
     setPhantomDragState(null);
@@ -3671,6 +3710,24 @@ export default function PackItScreen() {
 
   function handleNowYourTurn() {
     handleRestart();
+  }
+
+  function handleKeypadEnterPress() {
+    if (!showNextQuestionButton) {
+      return false;
+    }
+
+    if (revealCtaMode === "retry") {
+      handleNowYourTurn();
+      return true;
+    }
+
+    if (revealCtaMode === "next") {
+      goToNextQuestion();
+      return true;
+    }
+
+    return false;
   }
 
   useEffect(() => {
@@ -3725,13 +3782,7 @@ export default function PackItScreen() {
       return;
     }
 
-    const solvedCount =
-      questionIndex -
-      continuousAutopilotStartIndexRef.current +
-      (questionSolved ? 1 : 0);
-
     if (isRoundComplete) {
-      setIsContinuousAutopilot(false);
       setPhantomPos(null);
       setPhantomDragState(null);
       clearAutopilotSfxTimers();
@@ -3739,10 +3790,6 @@ export default function PackItScreen() {
     }
 
     if (questionSolved && showNextQuestionButton && revealCtaMode === "next") {
-      if (solvedCount >= AUTOPILOT_QUESTION_COUNT) {
-        setIsContinuousAutopilot(false);
-        return;
-      }
       if (autopilotAdvanceTimerRef.current !== null) {
         window.clearTimeout(autopilotAdvanceTimerRef.current);
       }
@@ -3868,12 +3915,64 @@ export default function PackItScreen() {
 
   function handleRoundCompleteContinue() {
     if (nextRoundName) {
-      handleRoundChange(nextRoundName);
+      handleRoundChange(nextRoundName, {
+        preserveContinuousAutopilot: isContinuousAutopilot,
+      });
       return;
     }
 
+    setIsContinuousAutopilot(false);
+    setPhantomPos(null);
+    setPhantomDragState(null);
     handleRestart();
   }
+
+  useEffect(() => {
+    if (!isRoundComplete || !isContinuousAutopilot || !nextRoundName) {
+      return;
+    }
+
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+    }
+
+    autopilotAdvanceTimerRef.current = window.setTimeout(() => {
+      autopilotAdvanceTimerRef.current = null;
+      const nextButtonCenter = getScreenCenter(roundCompleteButtonRef.current);
+      if (nextButtonCenter) {
+        setPhantomPos({
+          ...nextButtonCenter,
+          isClicking: false,
+          durationMs: 220,
+        });
+      }
+      window.setTimeout(() => {
+        if (nextButtonCenter) {
+          setPhantomPos({
+            ...nextButtonCenter,
+            isClicking: true,
+            durationMs: 120,
+          });
+        }
+        window.setTimeout(() => {
+          setPhantomPos(null);
+          handleRoundCompleteContinue();
+        }, 1000);
+      }, 320);
+    }, 1100);
+
+    return () => {
+      if (autopilotAdvanceTimerRef.current !== null) {
+        window.clearTimeout(autopilotAdvanceTimerRef.current);
+        autopilotAdvanceTimerRef.current = null;
+      }
+    };
+  }, [
+    handleRoundCompleteContinue,
+    isContinuousAutopilot,
+    isRoundComplete,
+    nextRoundName,
+  ]);
 
   const questionPanel = ({
     calculatorMinimized,
@@ -3883,8 +3982,8 @@ export default function PackItScreen() {
     toggleCalculatorMinimized: () => void;
   }) => {
     const messageTheme = chromeTheme.messagePanel;
-    const showInlineQuestionCta =
-      isMobileLandscape && calculatorMinimized && showNextQuestionButton;
+    const showBoxCornerCta = showNextQuestionButton;
+    const isDesktopExpanded = !isMobile && !calculatorMinimized;
 
     return (
       <div
@@ -3894,17 +3993,22 @@ export default function PackItScreen() {
             ? "4.5rem"
             : isMobileLandscape
               ? "100%"
+              : isDesktopExpanded
+                ? "calc(100% - 0.4rem)"
               : undefined,
           minHeight: calculatorMinimized
             ? "4.5rem"
             : isMobileLandscape
               ? "100%"
+              : isDesktopExpanded
+                ? "calc(100% - 0.4rem)"
               : "10.5rem",
+          marginTop: isDesktopExpanded ? "0.4rem" : undefined,
           transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
         }}
       >
         <div
-          className="font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border-[3px]"
+          className="relative font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border-[3px]"
           style={{
             background: messageTheme.outerBackground,
             borderColor: messageTheme.outerBorder,
@@ -3912,7 +4016,7 @@ export default function PackItScreen() {
           }}
         >
           <div
-            className={`block cursor-pointer px-5 font-semibold ${
+            className={`relative block cursor-pointer px-5 font-semibold ${
               isMobileLandscape
                 ? "text-[1rem] leading-snug"
                 : "text-[1.15rem] leading-relaxed"
@@ -3921,7 +4025,14 @@ export default function PackItScreen() {
             style={{
               minHeight: calculatorMinimized ? "100%" : "4.25rem",
               paddingTop: calculatorMinimized ? "0.25rem" : "0.5rem",
-              paddingBottom: calculatorMinimized ? "0.25rem" : "0.5rem",
+              paddingBottom:
+                calculatorMinimized && showBoxCornerCta
+                  ? "2.1rem"
+                  : calculatorMinimized
+                    ? "0.25rem"
+                    : "0.5rem",
+              paddingRight:
+                calculatorMinimized && showBoxCornerCta ? "5.5rem" : undefined,
               transition: `min-height ${DOCK_TRANSITION}, padding ${DOCK_TRANSITION}`,
               letterSpacing: "0.015em",
               background: messageTheme.headerBackground,
@@ -3937,21 +4048,6 @@ export default function PackItScreen() {
               highlight: QUESTION_KEYWORD_COLOR,
               symbol: QUESTION_SYMBOL_COLOR,
             })}
-            {showInlineQuestionCta ? (
-              <button
-                ref={nextQuestionButtonRef}
-                type="button"
-                onClick={
-                  revealCtaMode === "retry"
-                    ? handleNowYourTurn
-                    : goToNextQuestion
-                }
-                className="arcade-button inline-mobile-cta-delayed ml-3 inline-flex h-[1.85rem] cursor-pointer items-center rounded-full px-3 font-arcade text-[0.74rem] font-bold leading-none text-white align-middle transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
-                style={{ position: "relative", top: "2px" }}
-              >
-                {revealCtaMode === "retry" ? "Now you try it" : "Next"}
-              </button>
-            ) : null}
           </div>
           <div
             className="flex-1"
@@ -3972,16 +4068,12 @@ export default function PackItScreen() {
               style={{
                 background: messageTheme.bodyBackground,
                 color: messageTheme.text,
+                paddingBottom: showBoxCornerCta ? "3.5rem" : undefined,
+                paddingRight: showBoxCornerCta ? "6.25rem" : undefined,
               }}
             >
               {visibleStepLines.length > 0
                 ? visibleStepLines.map((line, index) => {
-                    const isLastVisibleLine =
-                      index === visibleStepLines.length - 1;
-                    const isFinalLine =
-                      index === question.blackboardSteps.length - 1 &&
-                      (typedStepLengths[index] ?? 0) >=
-                        question.blackboardSteps[index]!.length;
                     return (
                       <div key={`${index}-${line}`}>
                         {renderHighlightedQuestion(line, {
@@ -3989,31 +4081,36 @@ export default function PackItScreen() {
                           highlight: messageTheme.highlight,
                           symbol: QUESTION_SYMBOL_COLOR,
                         })}
-                        {isLastVisibleLine &&
-                        isFinalLine &&
-                        showNextQuestionButton &&
-                        !showInlineQuestionCta ? (
-                          <button
-                            ref={nextQuestionButtonRef}
-                            type="button"
-                            onClick={
-                              revealCtaMode === "retry"
-                                ? handleNowYourTurn
-                                : goToNextQuestion
-                            }
-                            className="arcade-button ml-4 inline-flex h-[2rem] cursor-pointer items-center rounded-full px-4 font-arcade text-[0.82rem] font-bold leading-none text-white align-middle transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
-                          >
-                            {revealCtaMode === "retry"
-                              ? "Now you try it"
-                              : "Next"}
-                          </button>
-                        ) : null}
                       </div>
                     );
                   })
                 : null}
             </div>
           </div>
+          {showBoxCornerCta ? (
+            <button
+              ref={nextQuestionButtonRef}
+              type="button"
+              onClick={
+                revealCtaMode === "retry"
+                  ? handleNowYourTurn
+                  : goToNextQuestion
+              }
+              className={`arcade-button absolute right-2 z-[2] inline-flex items-center rounded-full font-arcade font-bold leading-none text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${
+                calculatorMinimized
+                  ? "bottom-2 active:scale-[0.98]"
+                  : "top-1/2 -translate-y-1/2 active:scale-[0.98]"
+              } ${
+                isMobile
+                  ? isMobileLandscape
+                    ? "h-[44px] px-4 text-[0.82rem]"
+                    : "h-[38px] px-4 text-[0.82rem]"
+                  : "h-[38px] px-4 text-[0.82rem]"
+              }`}
+            >
+              {revealCtaMode === "retry" ? "Now you try it" : "Next"}
+            </button>
+          ) : null}
         </div>
       </div>
     );
@@ -4038,7 +4135,9 @@ export default function PackItScreen() {
         onQuestionDemo={solveCurrentQuestion}
         isQuestionDemo={isQuestionDemo}
         forceKeypadExpanded={isQuestionDemo}
+        autoExpandCalculator={autoExpandCalculator}
         onKeypadSubmit={handleSubmitAnswer}
+        onKeypadEnterPress={handleKeypadEnterPress}
         canSubmit={canSubmit}
         calculatorTopBanner={calculatorTopBanner}
         chromeTheme={chromeTheme}
@@ -4062,6 +4161,7 @@ export default function PackItScreen() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            style={{ touchAction: "none" }}
           >
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center">
               <div className="pointer-events-auto flex flex-col items-center gap-0">
@@ -4268,6 +4368,7 @@ export default function PackItScreen() {
                                   appearance: "none",
                                   WebkitAppearance: "none",
                                   boxShadow: "none",
+                                  touchAction: "none",
                                   zIndex:
                                     selectedItemIdSet.has(item.id) &&
                                     isGroupingPreviewActive
@@ -4341,34 +4442,13 @@ export default function PackItScreen() {
                     >
                       {containers.map((containerItems, index) =>
                         (() => {
-                          const isHovered =
-                            hoveredContainerIndex === index &&
-                            dragState?.origin === "source";
                           const isDisabledBox = index !== 0;
-                          const isOverfilled =
-                            containerItems.length > question.unitRate;
-                          const borderColor = isHovered
-                            ? "#facc15"
-                            : isOverfilled
-                              ? "#f87171"
-                              : isDisabledBox
-                                  ? "rgba(100,116,139,0.4)"
-                                  : "#475569";
-                          const counterColor = isOverfilled
-                            ? "#f87171"
-                            : isDisabledBox
-                                ? "rgba(103,232,249,0.42)"
-                                : "#67e8f9";
-                          const counterGlow = isOverfilled
-                            ? "rgba(248,113,113,0.72)"
-                            : isDisabledBox
-                                ? "rgba(103,232,249,0.28)"
-                                : "rgba(103,232,249,0.72)";
-                          const counterGlowOuter = isOverfilled
-                            ? "rgba(239,68,68,0.26)"
-                            : isDisabledBox
-                                ? "rgba(56,189,248,0.1)"
-                                : "rgba(56,189,248,0.26)";
+                          const borderColor = isDisabledBox
+                            ? "rgba(100,116,139,0.4)"
+                            : "#475569";
+                          const counterColor = "#67e8f9";
+                          const counterGlow = "rgba(103,232,249,0.72)";
+                          const counterGlowOuter = "rgba(56,189,248,0.26)";
 
                           return (
                             <div
@@ -4385,11 +4465,7 @@ export default function PackItScreen() {
                               style={{
                                 borderColor,
                                 background: "transparent",
-                                boxShadow: isHovered
-                                  ? "0 0 18px rgba(250,204,21,0.3)"
-                                  : isDisabledBox
-                                    ? "none"
-                                    : "none",
+                                boxShadow: "none",
                                 opacity: isDisabledBox ? 0.78 : 1,
                                 minHeight: `${containerMinHeightPx}px`,
                                 paddingLeft: `${containerPaddingX}px`,
@@ -4433,6 +4509,7 @@ export default function PackItScreen() {
                                     className="relative flex items-center justify-center bg-transparent leading-none"
                                     style={{
                                       ...itemBoxStyle,
+                                      touchAction: "none",
                                       opacity:
                                         (dragState?.isLifted &&
                                           draggedItemIds.has(item.id)) ||
@@ -4463,11 +4540,7 @@ export default function PackItScreen() {
                                     ) : null}
                                     <span
                                       className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                                      style={{
-                                        transform: selectedItemIdSet.has(item.id)
-                                          ? selectedItemTranslateY
-                                          : itemTranslateY,
-                                      }}
+                                      style={{ transform: itemTranslateY }}
                                     >
                                       {question.pair.itemEmoji}
                                     </span>
@@ -4484,14 +4557,15 @@ export default function PackItScreen() {
                   {dragState?.isLifted ? (
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none fixed z-[70] flex items-center gap-2 rounded-full bg-transparent"
+                      className="pointer-events-none fixed z-[70] flex items-center rounded-full bg-transparent"
                       style={{
                         left: dragState.x,
                         top: dragState.y,
+                        gap: `${dragState.origin === "container" ? containerGapPx : sourceGapPx}px`,
                       }}
                     >
                       <span
-                        className="pointer-events-none absolute inset-y-1 -inset-x-2 rounded-full"
+                        className="pointer-events-none absolute inset-y-0 -inset-x-2 rounded-full"
                         style={{
                           boxShadow:
                             "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
@@ -4521,16 +4595,17 @@ export default function PackItScreen() {
                   {phantomDragState ? (
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none fixed z-[190] flex items-center gap-2 rounded-full bg-transparent"
+                      className="pointer-events-none fixed z-[190] flex items-center rounded-full bg-transparent"
                       style={{
                         left: phantomDragState.x,
                         top: phantomDragState.y,
+                        gap: `${sourceGapPx}px`,
                         transition:
                           "left 920ms ease-in-out, top 920ms ease-in-out",
                       }}
                     >
                       <span
-                        className="pointer-events-none absolute inset-y-1 -inset-x-2 rounded-full"
+                        className="pointer-events-none absolute inset-y-0 -inset-x-2 rounded-full"
                         style={{
                           boxShadow:
                             "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
@@ -4722,11 +4797,11 @@ export default function PackItScreen() {
               {ROUND_LABELS[roundName]} Complete
             </div>
             <div className="mt-3 text-base font-bold text-cyan-200 md:text-lg">
-              Score: {score}/{round.questions.length}
+              Score: {roundCompletionScore}/{roundCompletionTotal}
             </div>
             <div className="mt-5 flex items-center justify-center gap-1.5">
-              {Array.from({ length: round.questions.length }, (_, index) => {
-                const filled = index < score;
+              {Array.from({ length: roundCompletionTotal }, (_, index) => {
+                const filled = index < roundCompletionScore;
                 return (
                   <div
                     key={index}
@@ -4742,6 +4817,7 @@ export default function PackItScreen() {
             </div>
             <div className="mt-8">
               <button
+                ref={roundCompleteButtonRef}
                 type="button"
                 onClick={handleRoundCompleteContinue}
                 className="arcade-button inline-flex h-12 items-center rounded-full px-6 font-arcade text-base font-bold uppercase tracking-[0.08em] text-white"

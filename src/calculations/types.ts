@@ -41,3 +41,9 @@ export interface RoundConfig {
   round: RoundName;
   questions: PackQuestion[];
 }
+
+export interface RoundGenerationProfile {
+  minTotalCount: number;
+  maxTotalCount: number;
+  maxGroupCount: number;
+}

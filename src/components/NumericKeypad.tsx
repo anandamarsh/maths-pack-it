@@ -19,6 +19,7 @@ interface NumericKeypadProps {
   onChange?: (v: string) => void;
   onKeyInput?: (key: string) => boolean;
   onSubmit?: () => void;
+  onEnterPress?: () => boolean;
   canSubmit?: boolean;
   /** Controlled from outside (GameLayout lifts this state) */
   minimized: boolean;
@@ -44,6 +45,7 @@ export default function NumericKeypad({
   onChange,
   onKeyInput,
   onSubmit,
+  onEnterPress,
   canSubmit = false,
   minimized,
   onToggleMinimized,
@@ -157,6 +159,10 @@ export default function NumericKeypad({
       }
 
       if (event.key === "Enter" || event.key === "=") {
+        if (onEnterPress?.()) {
+          event.preventDefault();
+          return;
+        }
         if (!canSubmit) {
           return;
         }
@@ -170,7 +176,7 @@ export default function NumericKeypad({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [canSubmit, onSubmit, value]);
+  }, [canSubmit, onEnterPress, onSubmit, value]);
 
   return (
     <div

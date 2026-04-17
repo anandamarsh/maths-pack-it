@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   useIsCoarsePointer,
@@ -51,6 +51,7 @@ interface GameLayoutProps {
   onKeypadChange?: (v: string) => void;
   onKeypadKeyInput?: (key: string) => boolean;
   onKeypadSubmit?: () => void;
+  onKeypadEnterPress?: () => boolean;
   canSubmit?: boolean;
   demoBanner?: ReactNode;
   calculatorTopBanner?: ReactNode;
@@ -104,6 +105,7 @@ interface GameLayoutProps {
 
   // Forces keypad to stay expanded (used by autopilot when typing)
   forceKeypadExpanded?: boolean;
+  autoExpandCalculator?: boolean;
   sceneBackdrop?: ReactNode;
   mobileMinimizeResetKey?: string | number;
   mobileWrongAnswerRevealKey?: string | number;
@@ -125,6 +127,7 @@ export default function GameLayout({
   onKeypadChange,
   onKeypadKeyInput,
   onKeypadSubmit,
+  onKeypadEnterPress,
   canSubmit = false,
   demoBanner,
   calculatorTopBanner,
@@ -146,6 +149,7 @@ export default function GameLayout({
   isQuestionDemo = false,
   onQuestionDemo,
   forceKeypadExpanded = false,
+  autoExpandCalculator = false,
   sceneBackdrop,
   mobileMinimizeResetKey,
   mobileWrongAnswerRevealKey,
@@ -168,6 +172,7 @@ export default function GameLayout({
   );
   const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string | null>(null);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
+  const pendingSubmitTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +202,14 @@ export default function GameLayout({
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (pendingSubmitTimerRef.current !== null) {
+        window.clearTimeout(pendingSubmitTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(
       YOUTUBE_BUBBLE_DISMISSED_KEY,
       youtubeBubbleDismissed ? "true" : "false",
@@ -215,11 +228,30 @@ export default function GameLayout({
     }
   }, [isMobileLandscape, mobileWrongAnswerRevealKey]);
 
+  useEffect(() => {
+    if (autoExpandCalculator) {
+      setCalcMinimized(false);
+    }
+  }, [autoExpandCalculator]);
+
   function toggleCalc() {
     setCalcMinimized((m) => !m);
   }
 
   function handleKeypadSubmit() {
+    if (pendingSubmitTimerRef.current !== null) {
+      return;
+    }
+
+    if (isCoarsePointer && !effectiveCalcMinimized && !forceKeypadExpanded) {
+      setCalcMinimized(true);
+      pendingSubmitTimerRef.current = window.setTimeout(() => {
+        pendingSubmitTimerRef.current = null;
+        onKeypadSubmit?.();
+      }, 320);
+      return;
+    }
+
     onKeypadSubmit?.();
   }
 
@@ -690,7 +722,7 @@ export default function GameLayout({
 
         {/* Bottom overlay — floats over canvas, anchored to bottom */}
         <div
-          className="absolute flex flex-row items-stretch gap-2"
+          className="absolute z-[90] flex flex-row items-stretch gap-2 pointer-events-auto"
           style={{
             bottom: "3px",
             left: "2px",
@@ -701,7 +733,7 @@ export default function GameLayout({
         >
           {/* Message box — same height as calculator, click = toggle */}
           {questionPanel !== undefined ? (
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pointer-events-auto">
               {typeof questionPanel === "function"
                 ? questionPanel({
                     calculatorMinimized: effectiveCalcMinimized,
@@ -710,7 +742,7 @@ export default function GameLayout({
                 : questionPanel}
             </div>
           ) : question !== undefined ? (
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pointer-events-auto">
               <QuestionBox
                 shake={questionShake}
                 onClick={toggleCalc}
@@ -723,7 +755,7 @@ export default function GameLayout({
 
           {/* Calculator */}
           {!hideKeypad && (
-            <div className="flex h-full min-h-0 flex-col justify-end self-stretch">
+            <div className="flex h-full min-h-0 flex-col justify-end self-stretch pointer-events-auto">
               {calculatorTopBanner ? (
                 <div
                   className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"
@@ -744,6 +776,7 @@ export default function GameLayout({
                 onChange={onKeypadChange}
                 onKeyInput={onKeypadKeyInput}
                 onSubmit={handleKeypadSubmit}
+                onEnterPress={onKeypadEnterPress}
                 canSubmit={canSubmit}
                 minimized={effectiveCalcMinimized}
                 onToggleMinimized={toggleCalc}
