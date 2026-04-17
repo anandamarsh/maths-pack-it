@@ -1489,7 +1489,7 @@ export default function PackItScreen() {
     `0 14px 18px -14px ${question.pair.palette}88`,
   ].join(", ");
   const itemSizePx = isMobile ? 32 : 48;
-  const itemFontSizePx = Math.round(itemSizePx * 0.72);
+  const itemFontSizePx = Math.round(itemSizePx * 0.84);
   const itemTranslateY = isMobileLandscape
     ? "translateY(2px)"
     : "translateY(4px)";
@@ -1504,17 +1504,18 @@ export default function PackItScreen() {
   const containerColumnPaddingTop = Math.max(2, Math.round(itemSizePx * 0.08));
   const containerPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
   const containerPaddingY = Math.max(4, Math.round(itemSizePx * 0.08));
+  const containerStackLiftPx = 8;
   const containerStackGapPx = 8;
   const containerStackStepPx = itemSizePx + containerStackGapPx;
   const containerInnerMinHeightPx =
     itemSizePx + Math.max(0, question.unitRate - 1) * containerStackStepPx;
-  const containerMinHeightPx = 520;
+  const containerMinHeightPx = isMobileLandscape ? 208 : 568;
   const containerWidthPx = Math.max(
     itemSizePx + containerPaddingX * 2,
     Math.round(itemSizePx * 1.9),
   );
   const containerStripGapPx = Math.max(18, Math.round(itemSizePx * 0.8));
-  const containerStripBottomOffsetPx = 64;
+  const containerStripBottomOffsetPx = isMobileLandscape ? 10 : 64;
   const containerSnapZonePaddingPx = Math.max(
     18,
     Math.round(itemSizePx * 0.55),
@@ -1529,7 +1530,9 @@ export default function PackItScreen() {
     width: `${itemSizePx}px`,
     height: `${itemSizePx}px`,
     fontSize: `${itemFontSizePx}px`,
+    lineHeight: 1,
   } as const;
+  const itemHalfPx = itemSizePx / 2;
   const calculatorTopBanner = showAnswerBanner ? (
     <span className="font-black tracking-[0.06em]">
       <span className="text-white">Answer:</span>{" "}
@@ -2162,8 +2165,8 @@ export default function PackItScreen() {
         return center
           ? {
               itemId: item.id,
-              x: center.x - 32,
-              y: center.y - 32,
+              x: center.x - itemHalfPx,
+              y: center.y - itemHalfPx,
               durationMs: 440,
             }
           : null;
@@ -2196,8 +2199,8 @@ export default function PackItScreen() {
             return center
               ? {
                   itemId: item.id,
-                  x: center.x - 32,
-                  y: center.y - 32,
+                  x: center.x - itemHalfPx,
+                  y: center.y - itemHalfPx,
                   durationMs: 440,
                 }
               : null;
@@ -2247,8 +2250,8 @@ export default function PackItScreen() {
         return center
           ? {
               itemId: item.id,
-              x: center.x - 32,
-              y: center.y - 32,
+              x: center.x - itemHalfPx,
+              y: center.y - itemHalfPx,
               durationMs: 480,
             }
           : null;
@@ -2286,8 +2289,8 @@ export default function PackItScreen() {
             return center
               ? {
                   itemId: item.id,
-                  x: center.x - 32,
-                  y: center.y - 32,
+                  x: center.x - itemHalfPx,
+                  y: center.y - itemHalfPx,
                   durationMs: 480,
                 }
               : null;
@@ -2336,8 +2339,8 @@ export default function PackItScreen() {
       setReturnStates([
         {
           itemId,
-          x: startCenter.x - 32,
-          y: startCenter.y - 32,
+          x: startCenter.x - itemHalfPx,
+          y: startCenter.y - itemHalfPx,
           durationMs: 240,
         },
       ]);
@@ -2359,8 +2362,8 @@ export default function PackItScreen() {
             ? [
                 {
                   itemId,
-                  x: targetCenter.x - 32,
-                  y: targetCenter.y - 32,
+                  x: targetCenter.x - itemHalfPx,
+                  y: targetCenter.y - itemHalfPx,
                   durationMs: 240,
                 },
               ]
@@ -2613,8 +2616,8 @@ export default function PackItScreen() {
                     return center
                       ? {
                           itemId,
-                          x: center.x - 32 + 8,
-                          y: center.y - 32 + 12,
+                          x: center.x - itemHalfPx,
+                          y: center.y - itemHalfPx,
                           durationMs: COLUMN_DROP_TRAVEL_MS,
                         }
                       : null;
@@ -3012,8 +3015,12 @@ export default function PackItScreen() {
             setPhantomDragState({
               itemIds: orderedGroup.map((entry) => entry.itemId),
               anchorItemId,
-              x: leadItemRect ? leadItemRect.left : leadItemCenter.x - 32,
-              y: leadItemRect ? leadItemRect.top : leadItemCenter.y - 32,
+              x: leadItemRect
+                ? leadItemRect.left
+                : leadItemCenter.x - itemHalfPx,
+              y: leadItemRect
+                ? leadItemRect.top
+                : leadItemCenter.y - itemHalfPx,
             });
           }
 
@@ -3021,8 +3028,8 @@ export default function PackItScreen() {
           window.setTimeout(() => {
             if (targetLeadPosition) {
               setPhantomPos({
-                x: targetLeadPosition.x + 32,
-                y: targetLeadPosition.y + 32,
+                x: targetLeadPosition.x + itemHalfPx,
+                y: targetLeadPosition.y + itemHalfPx,
                 isClicking: false,
                 durationMs: DEMO_DRAG_TRAVEL_MS,
               });
@@ -3037,8 +3044,8 @@ export default function PackItScreen() {
             window.setTimeout(() => {
               if (targetLeadPosition) {
                 setPhantomPos({
-                  x: targetLeadPosition.x + 32,
-                  y: targetLeadPosition.y + 32,
+                  x: targetLeadPosition.x + itemHalfPx,
+                  y: targetLeadPosition.y + itemHalfPx,
                   isClicking: true,
                   durationMs: 120,
                 });
@@ -3388,8 +3395,8 @@ export default function PackItScreen() {
               originRect
                 ? {
                     itemId,
-                    x: originRect.left + originRect.width / 2 - 32,
-                    y: originRect.top + originRect.height / 2 - 32,
+                    x: originRect.left + originRect.width / 2 - itemHalfPx,
+                    y: originRect.top + originRect.height / 2 - itemHalfPx,
                   }
                 : null,
             )
@@ -3747,7 +3754,11 @@ export default function PackItScreen() {
       .map((item) => {
         const center = getScreenCenter(itemRefs.current[item.id]);
         return center
-          ? { itemId: item.id, x: center.x - 32, y: center.y - 32 }
+          ? {
+              itemId: item.id,
+              x: center.x - itemHalfPx,
+              y: center.y - itemHalfPx,
+            }
           : null;
       })
       .filter((state): state is ReturnState => state !== null);
@@ -3767,7 +3778,11 @@ export default function PackItScreen() {
           .map((item) => {
             const center = getScreenCenter(itemRefs.current[item.id]);
             return center
-              ? { itemId: item.id, x: center.x - 32, y: center.y - 32 }
+              ? {
+                  itemId: item.id,
+                  x: center.x - itemHalfPx,
+                  y: center.y - itemHalfPx,
+                }
               : null;
           })
           .filter((state): state is ReturnState => state !== null);
@@ -4437,25 +4452,27 @@ export default function PackItScreen() {
                         </button>
                       </div>
                     ) : null}
-                    <div
-                      className="pointer-events-none absolute left-0 right-0 z-[2]"
-                      style={lowerCountsStyle}
-                    >
-                      <div className="flex">
-                        <div
-                          className="flex justify-center"
-                          style={{ width: `${sourcePanelWidthPercent}%` }}
-                        >
-                          <DigitalCount value={remainingItems.length} />
-                        </div>
-                        <div
-                          className="flex justify-center"
-                          style={{ width: `${containerPanelWidthPercent}%` }}
-                        >
-                          <DigitalCount value={packedItemsTotal} />
+                    {!isMobileLandscape ? (
+                      <div
+                        className="pointer-events-none absolute left-0 right-0 z-[2]"
+                        style={lowerCountsStyle}
+                      >
+                        <div className="flex">
+                          <div
+                            className="flex justify-center"
+                            style={{ width: `${sourcePanelWidthPercent}%` }}
+                          >
+                            <DigitalCount value={remainingItems.length} />
+                          </div>
+                          <div
+                            className="flex justify-center"
+                            style={{ width: `${containerPanelWidthPercent}%` }}
+                          >
+                            <DigitalCount value={packedItemsTotal} />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : null}
 
                     <div
                       className="relative z-[3] grid h-full gap-0 px-0 pb-0 pt-7"
@@ -4642,7 +4659,7 @@ export default function PackItScreen() {
                                   style={{
                                     width: "100%",
                                     minHeight: `${containerInnerMinHeightPx}px`,
-                                    bottom: `${containerPaddingY}px`,
+                                    bottom: `${containerPaddingY + containerStackLiftPx}px`,
                                   }}
                                 >
                                   {containerItems.map((item, stackIndex) => (
@@ -4741,16 +4758,16 @@ export default function PackItScreen() {
                                   : undefined,
                               }}
                             >
-                            <span
-                              className="pointer-events-none absolute inset-0 rounded-full"
-                              style={{
-                                boxShadow:
-                                  "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
-                                background: "none",
-                                backgroundColor: "transparent",
-                                backgroundImage: "none",
-                              }}
-                            />
+                              <span
+                                className="pointer-events-none absolute inset-0 rounded-full"
+                                style={{
+                                  boxShadow:
+                                    "0 0 0 4px rgba(250,204,21,0.86), 0 0 0 14px rgba(250,204,21,0.16), 0 0 24px rgba(250,204,21,0.42), 0 0 42px rgba(250,204,21,0.3)",
+                                  background: "none",
+                                  backgroundColor: "transparent",
+                                  backgroundImage: "none",
+                                }}
+                              />
                               {previewPositions.map(({ itemId, x }) => (
                                 <span
                                   key={`drag-${itemId}`}
@@ -4834,7 +4851,10 @@ export default function PackItScreen() {
                           ...itemBoxStyle,
                         }}
                       >
-                        <span className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center">
+                        <span
+                          className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                          style={{ transform: itemTranslateY }}
+                        >
                           {question.pair.itemEmoji}
                         </span>
                       </div>

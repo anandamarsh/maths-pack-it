@@ -9,9 +9,9 @@ import type {
 
 const MOBILE_ROUND_PROFILE: RoundGenerationProfile = {
   minTotalCount: 20,
-  maxTotalCount: 80,
+  maxTotalCount: 40,
   maxGroupCount: 8,
-  maxUnitCount: 10,
+  maxUnitCount: 5,
 };
 
 const DESKTOP_ROUND_PROFILE: RoundGenerationProfile = {
