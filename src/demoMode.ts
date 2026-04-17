@@ -1,4 +1,6 @@
-const demoModeStorageKey = "maths-game-template:demo-mode";
+import { GAME_STORAGE_PREFIX } from "./config/game";
+
+const demoModeStorageKey = `${GAME_STORAGE_PREFIX}:demo-mode`;
 
 export type DemoConfig = {
   enabled: boolean;

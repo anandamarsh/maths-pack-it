@@ -145,9 +145,9 @@ test.describe("Demo Video Recording", () => {
     await expect(videoButton).toBeHidden();
 
     const introFrame = page.frameLocator('iframe[title="Demo intro screen"]');
-    const syllabus = introFrame.getByText("Early Stage 1");
-    const outcome = introFrame.getByText("MAe-1WM Demonstrates and describes counting sequences");
-    const description = introFrame.getByText("Children learn to count objects and recognise numbers by tapping the screen to create ripples, then counting and entering the total.");
+    const syllabus = introFrame.getByText("Stage 4");
+    const outcome = introFrame.getByText("MA4-RAT-C-01 Solves problems involving ratios and rates using the unitary method");
+    const description = introFrame.getByText("Players pack items into equal groups, discover the unit rate, and use that rate to solve scaling problems.");
 
     await expect(syllabus).toBeVisible();
     await expect(outcome).toBeVisible();

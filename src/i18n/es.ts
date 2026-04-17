@@ -59,11 +59,11 @@ const es: Translations = {
   "social.youtubeDismiss": "No volver a mostrar",
 
   // PDF
-  "pdf.title": "Ripple Touch",
+  "pdf.title": "Pack It!",
   "pdf.sessionReport": "Informe de sesión (Nivel {n})",
-  "pdf.gameDescription": "Conteo y reconocimiento de números",
+  "pdf.gameDescription": "Método unitario y tasas unitarias",
   "pdf.objectiveLabel": "Objetivo:",
-  "pdf.objectiveText": "Cuenta las ondas en la pantalla e introduce el número correcto en el teclado.",
+  "pdf.objectiveText": "Agrupa objetos en partes iguales, encuentra la tasa unitaria y úsala para resolver la pregunta.",
   "pdf.scoreLabel": "Puntuación",
   "pdf.accuracyLabel": "Precisión",
   "pdf.timeLabel": "Tiempo total",
@@ -80,7 +80,7 @@ const es: Translations = {
   "pdf.encourage50": "¡Buen esfuerzo! ¡Sigue practicando y serás un experto!",
   "pdf.encourageBelow": "¡Buen intento! ¡Cada intento te hace más fuerte!",
   "pdf.tip": "Consejo: Intenta contar con más cuidado la próxima vez — ¡tómate tu tiempo!",
-  "pdf.footer": "Generado por SeeMaths - Ripple Touch",
+  "pdf.footer": "Generado por SeeMaths - Pack It!",
   "pdf.footerUrl": "https://www.seemaths.com",
 
   // Email
@@ -95,8 +95,8 @@ const es: Translations = {
   "email.sendFailed": "No se pudo enviar el correo del informe.",
 
   // Curriculum
-  "curriculum.stageEarlyStage1": "Currículo de NSW de Etapa Inicial 1 (Kindergarten)",
-  "curriculum.outcomeMae1wm": "Demuestra y describe secuencias de conteo",
+  "curriculum.stageEarlyStage1": "Matemáticas de NSW Etapa 4",
+  "curriculum.outcomeMae1wm": "Resuelve problemas de razones y tasas usando el método unitario",
 
   // Language switcher
   "lang.label": "Idioma",

@@ -6,6 +6,7 @@ import {
   useIsCoarsePointer,
   useIsMobileLandscape,
 } from "../hooks/useMediaQuery";
+import { GAME_STORAGE_PREFIX, getGameShareUrl } from "../config/game";
 import { useT } from "../i18n";
 import { SocialComments, SocialShare, openCommentsComposer } from "./Social";
 import AudioButton from "./AudioButton";
@@ -16,7 +17,7 @@ import NumericKeypad from "./NumericKeypad";
 import QuestionBox from "./QuestionBox";
 
 const YOUTUBE_BUBBLE_DISMISSED_KEY =
-  "maths-game-template:youtube-bubble-dismissed";
+  `${GAME_STORAGE_PREFIX}:youtube-bubble-dismissed`;
 const YOUTUBE_ICON_URL = "/youtube-circle-logo-svgrepo-com.svg";
 
 function readYouTubeBubbleDismissed() {
@@ -270,7 +271,7 @@ export default function GameLayout({
       try {
         await navigator.share({
           title: t("social.shareTitle"),
-          url: "https://interactive-maths.vercel.app/",
+          url: getGameShareUrl(),
         });
       } catch {
         /* dismissed */

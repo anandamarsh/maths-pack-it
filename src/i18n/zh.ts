@@ -59,11 +59,11 @@ const zh: Translations = {
   "social.youtubeDismiss": "不再显示",
 
   // PDF
-  "pdf.title": "涟漪触控",
+  "pdf.title": "Pack It!",
   "pdf.sessionReport": "学习报告（第 {n} 关）",
-  "pdf.gameDescription": "计数与数字认知",
+  "pdf.gameDescription": "单位法与单位率",
   "pdf.objectiveLabel": "目标：",
-  "pdf.objectiveText": "数出屏幕上的涟漪，并在键盘上输入正确数字。",
+  "pdf.objectiveText": "把物品平均装箱，找出单位率，并用它来解答问题。",
   "pdf.scoreLabel": "得分",
   "pdf.accuracyLabel": "正确率",
   "pdf.timeLabel": "总用时",
@@ -80,7 +80,7 @@ const zh: Translations = {
   "pdf.encourage50": "不错的尝试！继续练习你会成为高手！",
   "pdf.encourageBelow": "加油！每次尝试都会让你更强！",
   "pdf.tip": "小提示：下次数的时候慢慢来，仔细数！",
-  "pdf.footer": "由 SeeMaths - 涟漪触控 生成",
+  "pdf.footer": "由 SeeMaths - Pack It! 生成",
   "pdf.footerUrl": "https://www.seemaths.com",
 
   // Email
@@ -95,8 +95,8 @@ const zh: Translations = {
   "email.sendFailed": "报告邮件发送失败。",
 
   // Curriculum
-  "curriculum.stageEarlyStage1": "新南威尔士州课程早期阶段 1（幼儿园）",
-  "curriculum.outcomeMae1wm": "展示并描述计数顺序",
+  "curriculum.stageEarlyStage1": "新南威尔士州数学第 4 阶段",
+  "curriculum.outcomeMae1wm": "使用单位法解决比率与速率问题",
 
   // Language switcher
   "lang.label": "语言",

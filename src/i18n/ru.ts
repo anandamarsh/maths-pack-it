@@ -59,11 +59,11 @@ const ru: Translations = {
   "social.youtubeDismiss": "Больше не показывать",
 
   // PDF
-  "pdf.title": "Ripple Touch",
+  "pdf.title": "Pack It!",
   "pdf.sessionReport": "Отчёт о сессии (Уровень {n})",
-  "pdf.gameDescription": "Счёт и распознавание чисел",
+  "pdf.gameDescription": "Унитарный метод и удельные нормы",
   "pdf.objectiveLabel": "Цель:",
-  "pdf.objectiveText": "Посчитайте круги на экране и введите правильное число на клавиатуре.",
+  "pdf.objectiveText": "Разложите предметы по равным группам, найдите единичную норму и используйте её для решения задачи.",
   "pdf.scoreLabel": "Счёт",
   "pdf.accuracyLabel": "Точность",
   "pdf.timeLabel": "Общее время",
@@ -80,7 +80,7 @@ const ru: Translations = {
   "pdf.encourage50": "Хорошая попытка! Продолжай тренироваться!",
   "pdf.encourageBelow": "Молодец! Каждая попытка делает тебя сильнее!",
   "pdf.tip": "Совет: В следующий раз считай внимательнее — не торопись!",
-  "pdf.footer": "Создано SeeMaths - Ripple Touch",
+  "pdf.footer": "Создано SeeMaths - Pack It!",
   "pdf.footerUrl": "https://www.seemaths.com",
 
   // Email
@@ -95,8 +95,8 @@ const ru: Translations = {
   "email.sendFailed": "Не удалось отправить отчёт по email.",
 
   // Curriculum
-  "curriculum.stageEarlyStage1": "Учебная программа NSW, ранний этап 1 (Kindergarten)",
-  "curriculum.outcomeMae1wm": "Демонстрирует и описывает последовательности счёта",
+  "curriculum.stageEarlyStage1": "Математика NSW, этап 4",
+  "curriculum.outcomeMae1wm": "Решает задачи на отношения и нормы с использованием унитарного метода",
 
   // Language switcher
   "lang.label": "Язык",

@@ -18,16 +18,16 @@ test("sends report email via /api/send-report", async ({ request }) => {
       correctCount: 3,
       totalQuestions: 3,
       accuracy: 100,
-      gameName: "Ripple Touch",
-      senderName: "SeeMaths Ripple Touch",
-      siteUrl: "https://www.seemaths.com",
+      gameName: "Pack It!",
+      senderName: "Pack It!",
+      siteUrl: "https://maths-pack-it.vercel.app",
       sessionTime: "10:00 am",
       sessionDate: "6th Apr",
       durationText: "2 minutes",
-      stageLabel: "Stage 1 (Years 1-2) NSW Curriculum",
-      curriculumCode: "MAe-1WM",
-      curriculumDescription: "Demonstrates and describes counting sequences",
-      reportFileName: "ripple-report-test-explorer.pdf",
+      stageLabel: "NSW Mathematics Stage 4",
+      curriculumCode: "MA4-RAT-C-01",
+      curriculumDescription: "Solves problems involving ratios and rates using the unitary method",
+      reportFileName: "pack-it-report-test-explorer.pdf",
     },
   });
 
@@ -39,5 +39,5 @@ test("sends report email via /api/send-report", async ({ request }) => {
   expect(body.ok).toBe(true);
 
   console.log(`\n✅ Email sent successfully to ${TEST_EMAIL}`);
-  console.log("Check your inbox for the Ripple Touch report.");
+  console.log("Check your inbox for the Pack It! report.");
 });

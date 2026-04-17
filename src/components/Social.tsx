@@ -9,8 +9,8 @@ import {
   WhatsappShareButton,
 } from "react-share";
 import { useT } from "../i18n";
+import { getGamePageUrl, getGameShareUrl } from "../config/game";
 
-const SHARE_URL = "https://interactive-maths.vercel.app/";
 const DEFAULT_DISCUSSIT_URL = import.meta.env.PROD
   ? "https://discussit-widget.vercel.app"
   : "http://localhost:5001";
@@ -21,42 +21,35 @@ const LOCAL_DISCUSSIT_URL = (
   .replace(/\/$/, "");
 
 function getCommentsPageUrl() {
-  if (typeof window === "undefined") return SHARE_URL;
-  try {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("level");
-    url.searchParams.delete("demo");
-    return url.toString();
-  } catch {
-    return window.location.href;
-  }
+  return getGamePageUrl();
 }
 
 export function SocialShare() {
   const t = useT();
   const shareTitle = t("social.shareTitle");
+  const shareUrl = getGameShareUrl();
 
   return (
     <div className="social-share-buttons">
-      <TwitterShareButton url={SHARE_URL} title={shareTitle}>
+      <TwitterShareButton url={shareUrl} title={shareTitle}>
         <span className="social-share-chip">
           <TwitterIcon size={36} round />
           <span>X</span>
         </span>
       </TwitterShareButton>
-      <FacebookShareButton url={SHARE_URL} hashtag="#interactivemaths">
+      <FacebookShareButton url={shareUrl} hashtag="#interactivemaths">
         <span className="social-share-chip">
           <FacebookIcon size={36} round />
           <span>Facebook</span>
         </span>
       </FacebookShareButton>
-      <WhatsappShareButton url={SHARE_URL} title={shareTitle} separator=" - ">
+      <WhatsappShareButton url={shareUrl} title={shareTitle} separator=" - ">
         <span className="social-share-chip">
           <WhatsappIcon size={36} round />
           <span>WhatsApp</span>
         </span>
       </WhatsappShareButton>
-      <LinkedinShareButton url={SHARE_URL} title={shareTitle} summary={shareTitle}>
+      <LinkedinShareButton url={shareUrl} title={shareTitle} summary={shareTitle}>
         <span className="social-share-chip">
           <LinkedinIcon size={36} round />
           <span>LinkedIn</span>

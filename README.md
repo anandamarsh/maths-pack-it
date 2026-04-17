@@ -1,16 +1,14 @@
-# Maths Game Template
+# Pack It!
 
-![Ripple Touch gameplay](public/screenshots/ripple-scene-s4.png)
+> An Interactive Maths game for practising the unitary method through equal-group packing problems.
 
-> A production-ready starter kit for building interactive maths games — deployed as a PWA on Vercel in minutes.
-
-**Live demo:** https://maths-game-template.vercel.app/
+**Planned live URL:** https://maths-pack-it.vercel.app/
 
 ---
 
 ## What it is
 
-A complete, battle-tested game framework. The demo game "Ripple Touch" ships inside it — tap the canvas to make ripples, count them, enter your answer. Every feature a real game needs is already built and wired up:
+Pack It! is built on the Interactive Maths game framework and is ready for deployment as a PWA on Vercel.
 
 - Numeric keypad with DSEG7 LCD display
 - Session reports emailed as PDF (via Resend)
@@ -20,15 +18,15 @@ A complete, battle-tested game framework. The demo game "Ripple Touch" ships ins
 - Social sharing + embedded comments
 - PWA — installable and offline-capable
 
-**To build a new game:** replace `src/game/rippleGame.ts` with your own logic, and adapt `src/screens/RippleScreen.tsx` for your canvas. Everything else — layout, keypad, sound, reporting, i18n, autopilot — is already done.
+Current game entry points are `src/game/packItGame.ts` and `src/screens/PackItScreen.tsx`.
 
 ---
 
 ## Quick start
 
 ```bash
-git clone https://github.com/anandamarsh/maths-game-template.git my-game
-cd my-game
+git clone https://github.com/anandamarsh/maths-pack-it.git
+cd maths-pack-it
 npm install
 npm run dev   # http://localhost:4005
 ```

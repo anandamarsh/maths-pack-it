@@ -61,7 +61,7 @@ function localApiPlugin() {
                 temperature: 0.3,
                 response_format: { type: 'json_object' },
                 messages: [
-                  { role: 'system', content: `You are a professional translator. Translate the JSON object values from English to ${targetLang}. Rules:\n1. Preserve all {placeholder} tokens exactly as-is.\n2. Do not translate URLs.\n3. Do not translate brand names like "SeeMaths", "Ripple Touch", "DiscussIt", "Interactive Maths".\n4. Return a JSON object with two fields: "translations" (the translated strings) and "langCode" (ISO 639-1 two-letter code).` },
+                  { role: 'system', content: `You are a professional translator. Translate the JSON object values from English to ${targetLang}. Rules:\n1. Preserve all {placeholder} tokens exactly as-is.\n2. Do not translate URLs.\n3. Do not translate brand names like "SeeMaths", "Pack It!", "DiscussIt", and "Interactive Maths".\n4. Return a JSON object with two fields: "translations" (the translated strings) and "langCode" (ISO 639-1 two-letter code).` },
                   { role: 'user', content: JSON.stringify(strings) },
                 ],
               }),

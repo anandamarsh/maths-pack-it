@@ -59,11 +59,11 @@ const hi: Translations = {
   "social.youtubeDismiss": "दोबारा न दिखाएं",
 
   // PDF
-  "pdf.title": "Ripple Touch",
+  "pdf.title": "Pack It!",
   "pdf.sessionReport": "सत्र रिपोर्ट (स्तर {n})",
-  "pdf.gameDescription": "गिनती और संख्या पहचान",
+  "pdf.gameDescription": "एकक विधि और इकाई दर",
   "pdf.objectiveLabel": "उद्देश्य:",
-  "pdf.objectiveText": "स्क्रीन पर लहरें गिनें और सही संख्या कीपैड पर दर्ज करें।",
+  "pdf.objectiveText": "सामानों को बराबर समूहों में पैक करें, इकाई दर निकालें और उससे प्रश्न हल करें।",
   "pdf.scoreLabel": "स्कोर",
   "pdf.accuracyLabel": "सटीकता",
   "pdf.timeLabel": "कुल समय",
@@ -80,7 +80,7 @@ const hi: Translations = {
   "pdf.encourage50": "अच्छी कोशिश! अभ्यास जारी रखें!",
   "pdf.encourageBelow": "हिम्मत रखें! हर कोशिश आपको मजबूत बनाती है!",
   "pdf.tip": "सुझाव: अगली बार धीरे-धीरे और ध्यान से गिनें!",
-  "pdf.footer": "SeeMaths - Ripple Touch द्वारा बनाया गया",
+  "pdf.footer": "SeeMaths - Pack It! द्वारा बनाया गया",
   "pdf.footerUrl": "https://www.seemaths.com",
 
   // Email
@@ -95,8 +95,8 @@ const hi: Translations = {
   "email.sendFailed": "रिपोर्ट ईमेल नहीं भेजी जा सकी।",
 
   // Curriculum
-  "curriculum.stageEarlyStage1": "NSW पाठ्यक्रम प्रारंभिक चरण 1 (किंडरगार्टन)",
-  "curriculum.outcomeMae1wm": "गिनती के क्रम को दर्शाता और वर्णन करता है",
+  "curriculum.stageEarlyStage1": "NSW गणित चरण 4",
+  "curriculum.outcomeMae1wm": "एकक विधि का उपयोग करके अनुपात और दरों की समस्याएँ हल करता है",
 
   // Language switcher
   "lang.label": "भाषा",

@@ -26,6 +26,11 @@ function getSydneyStamp() {
 }
 
 function getCommitShortSha() {
+  const vercelSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
+  if (vercelSha) {
+    return vercelSha.slice(0, 7);
+  }
+
   try {
     return execSync("git rev-parse --short HEAD", {
       stdio: ["ignore", "pipe", "ignore"],

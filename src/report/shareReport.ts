@@ -2,24 +2,34 @@
 
 import { generateSessionPdf } from "./generatePdf";
 import type { SessionSummary } from "./sessionLog";
+import { GAME_NAME, GAME_SITE_URL } from "../config/game";
 import { getLocaleFormat, getT } from "../i18n";
 import type { TFunction } from "../i18n/types";
 
-const SITE_URL = "https://www.seemaths.com";
-const GAME_NAME = "Ripple Touch";
-const SENDER_NAME = "Ripple Touch";
+const SITE_URL = GAME_SITE_URL;
+const SENDER_NAME = GAME_NAME;
 const CURRICULUM_INDEX_URL =
   "https://www.educationstandards.nsw.edu.au/wps/portal/nesa/k-10/learning-areas/mathematics/mathematics-k-10";
 const CURRICULUM_BY_LEVEL = {
   1: {
-    code: "MAe-1WM",
+    code: "MA4-RAT-C-01",
     syllabusUrl:
-      "https://www.educationstandards.nsw.edu.au/wps/wcm/connect/ffb1e831-46fc-4db6-975c-7be286334e74/stage-statements-and-outcomes-programming-tool-k-10-landscape.pdf?CVID=&MOD=AJPERES#page=6",
+      "https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content/stage-4/fa0927d16d",
   },
   2: {
-    code: "MAe-1WM",
+    code: "MA4-RAT-C-01",
     syllabusUrl:
-      "https://www.educationstandards.nsw.edu.au/wps/wcm/connect/ffb1e831-46fc-4db6-975c-7be286334e74/stage-statements-and-outcomes-programming-tool-k-10-landscape.pdf?CVID=&MOD=AJPERES#page=6",
+      "https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content/stage-4/fa0927d16d",
+  },
+  3: {
+    code: "MA4-RAT-C-01",
+    syllabusUrl:
+      "https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content/stage-4/fa0927d16d",
+  },
+  4: {
+    code: "MA4-RAT-C-01",
+    syllabusUrl:
+      "https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content/stage-4/fa0927d16d",
   },
 } as const;
 
@@ -31,7 +41,7 @@ function getCurrentLocale(): string {
 function getReportFileName(summary: SessionSummary): string {
   const stamp = new Date().toISOString().slice(0, 10);
   const name = (summary.playerName || "explorer").toLowerCase().replace(/\s+/g, "-");
-  return `ripple-report-${name}-${stamp}.pdf`;
+  return `pack-it-report-${name}-${stamp}.pdf`;
 }
 
 function formatSessionDate(timestamp: number, locale: string): string {

@@ -9,6 +9,7 @@
   "orientation": "landscape",
   "background_color": "#0d1b35",
   "theme_color": "#0d1b35",
+  "description": "Build: __BUILD_STAMP__\n\nPack It! is an Interactive Maths game about the unitary method. Children pack items into equal groups, see the unit rate emerge on a blackboard, and then use that rate to solve scaling problems.",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     {
@@ -24,25 +25,19 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
-    "screenshots/ripple-scene-s1.png",
-    "screenshots/ripple-scene-s2.png",
-    "screenshots/ripple-scene-s3.png",
-    "screenshots/ripple-scene-s4.png"
-  ],
   "tags": ["unitary method", "ratios", "grouping", "packing"],
-  "subjects": ["maths"],
+  "subjects": ["mathematics"],
   "skills": ["unitary method", "division", "equal grouping"],
   "teachesLevels": [
     {
-      "label": "Counting sequences and number recognition through tap-based exploration",
-      "stageLabel": "Early Stage 1 (Kindergarten)",
-      "syllabusCode": "MAe-1WM",
-      "syllabusUrl": "https://www.educationstandards.nsw.edu.au/wps/wcm/connect/ffb1e831-46fc-4db6-975c-7be286334e74/stage-statements-and-outcomes-programming-tool-k-10-landscape.pdf?CVID=&MOD=AJPERES#page=6",
-      "syllabusDescription": "Demonstrates and describes counting sequences."
+      "label": "Uses the unitary method to solve ratio and rate problems through equal-group packing scenarios",
+      "stageLabel": "Stage 4",
+      "syllabusCode": "MA4-RAT-C-01",
+      "syllabusUrl": "https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content/stage-4/fa0927d16d",
+      "syllabusDescription": "Solves problems involving ratios and rates using the unitary method."
     }
   ],
   "githubUrl": "https://github.com/anandamarsh/maths-pack-it",
   "videoUrl": "https://youtu.be/Jrby8axVhbY?si=gQb8uQH381ddhZSU",
-  "description": "Build: __BUILD_STAMP__\n\nPack It! is an Interactive Maths game about the unitary method. Children pack items into equal groups, see the unit rate emerge on a blackboard, and then use that rate to solve scaling problems."
+  "curriculum": "NSW MA4-RAT-C-01"
 }
