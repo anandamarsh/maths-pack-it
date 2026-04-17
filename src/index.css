@@ -92,11 +92,19 @@ html[data-block-touch-menus="true"] [contenteditable="true"] {
   85% { transform: translateY(78vh) scale(1); opacity: 1; }
   100% { transform: translateY(95vh) scale(1); opacity: 0; }
 }
+@keyframes inline-mobile-cta-reveal {
+  to { opacity: 1; }
+}
 
 .animate-bounce-in { animation: bounce-in 0.4s cubic-bezier(0.36,0.07,0.19,0.97); }
 .animate-shake     { animation: shake 0.4s ease-in-out; }
 .animate-pop       { animation: pop 0.3s ease-in-out; }
 .animate-float     { animation: float 3s ease-in-out infinite; }
+
+.inline-mobile-cta-delayed {
+  opacity: 0;
+  animation: inline-mobile-cta-reveal 0s linear 1s forwards;
+}
 
 /* ── Utility classes ───────────────────────────────────────────────────── */
 

@@ -1370,6 +1370,8 @@ export default function PackItScreen() {
   const [isCalculatorAdjusting, setIsCalculatorAdjusting] = useState(false);
   const [forceAnswerBanner, setForceAnswerBanner] = useState(false);
   const [isContinuousAutopilot, setIsContinuousAutopilot] = useState(false);
+  const [mobileWrongAnswerRevealKey, setMobileWrongAnswerRevealKey] =
+    useState(0);
   const [snipMode, setSnipMode] = useState(false);
   const [snipSelection, setSnipSelection] = useState<SquareSnip>({
     x: 24,
@@ -1432,10 +1434,7 @@ export default function PackItScreen() {
   );
   const remainingItems = items.filter((item) => item.containerIndex === null);
   const packedItemsTotal = items.length - remainingItems.length;
-  const canSubmit =
-    revealCtaMode === null &&
-    !isCalculatorAdjusting &&
-    (question.round === "ship" ? true : packedItemsTotal > 0);
+  const canSubmit = true;
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const returningItemIds = new Set(returnStates.map((state) => state.itemId));
   const draggedItemIds = new Set(dragState?.itemIds ?? []);
@@ -2442,8 +2441,14 @@ export default function PackItScreen() {
     setCalculatorInput(normalizedValue);
     setCalculatorOverride(true);
 
+    if (keypadDebounceRef.current !== null) {
+      window.clearTimeout(keypadDebounceRef.current);
+      keypadDebounceRef.current = null;
+    }
+
     if (question.round === "ship") {
       clearKeypadAdjustTimers();
+      setIsCalculatorAdjusting(false);
       return;
     }
 
@@ -2958,6 +2963,12 @@ export default function PackItScreen() {
     playCorrect();
   }
 
+  function revealWrongAnswerStateOnMobile() {
+    if (isMobileLandscape) {
+      setMobileWrongAnswerRevealKey((current) => current + 1);
+    }
+  }
+
   function handleSubmitAnswer() {
     if (question.round === "ship") {
       const submittedAnswer = Number.parseInt(calculatorInput, 10);
@@ -2974,6 +2985,7 @@ export default function PackItScreen() {
           setQuestionSolved(false);
           setFlash({ ok: false, icon: true });
           markQuestionPenalty();
+          revealWrongAnswerStateOnMobile();
           playWrong();
         }, SHIP_RESULT_DELAY_MS);
       });
@@ -2995,6 +3007,7 @@ export default function PackItScreen() {
     setQuestionSolved(false);
     setFlash({ ok: false, icon: true });
     markQuestionPenalty();
+    revealWrongAnswerStateOnMobile();
     playWrong();
   }
 
@@ -3870,6 +3883,8 @@ export default function PackItScreen() {
     toggleCalculatorMinimized: () => void;
   }) => {
     const messageTheme = chromeTheme.messagePanel;
+    const showInlineQuestionCta =
+      isMobileLandscape && calculatorMinimized && showNextQuestionButton;
 
     return (
       <div
@@ -3922,6 +3937,21 @@ export default function PackItScreen() {
               highlight: QUESTION_KEYWORD_COLOR,
               symbol: QUESTION_SYMBOL_COLOR,
             })}
+            {showInlineQuestionCta ? (
+              <button
+                ref={nextQuestionButtonRef}
+                type="button"
+                onClick={
+                  revealCtaMode === "retry"
+                    ? handleNowYourTurn
+                    : goToNextQuestion
+                }
+                className="arcade-button inline-mobile-cta-delayed ml-3 inline-flex h-[1.85rem] cursor-pointer items-center rounded-full px-3 font-arcade text-[0.74rem] font-bold leading-none text-white align-middle transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
+                style={{ position: "relative", top: "2px" }}
+              >
+                {revealCtaMode === "retry" ? "Now you try it" : "Next"}
+              </button>
+            ) : null}
           </div>
           <div
             className="flex-1"
@@ -3961,7 +3991,8 @@ export default function PackItScreen() {
                         })}
                         {isLastVisibleLine &&
                         isFinalLine &&
-                        showNextQuestionButton ? (
+                        showNextQuestionButton &&
+                        !showInlineQuestionCta ? (
                           <button
                             ref={nextQuestionButtonRef}
                             type="button"
@@ -4011,6 +4042,8 @@ export default function PackItScreen() {
         canSubmit={canSubmit}
         calculatorTopBanner={calculatorTopBanner}
         chromeTheme={chromeTheme}
+        mobileMinimizeResetKey={`${roundName}-${questionIndex}`}
+        mobileWrongAnswerRevealKey={mobileWrongAnswerRevealKey}
         levelCount={4}
         currentLevel={1}
         unlockedLevel={1}

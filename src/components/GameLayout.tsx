@@ -105,6 +105,8 @@ interface GameLayoutProps {
   // Forces keypad to stay expanded (used by autopilot when typing)
   forceKeypadExpanded?: boolean;
   sceneBackdrop?: ReactNode;
+  mobileMinimizeResetKey?: string | number;
+  mobileWrongAnswerRevealKey?: string | number;
 
   // Game canvas
   children:
@@ -145,6 +147,8 @@ export default function GameLayout({
   onQuestionDemo,
   forceKeypadExpanded = false,
   sceneBackdrop,
+  mobileMinimizeResetKey,
+  mobileWrongAnswerRevealKey,
   children,
   questionPanel,
 }: GameLayoutProps) {
@@ -199,15 +203,24 @@ export default function GameLayout({
     );
   }, [youtubeBubbleDismissed]);
 
+  useEffect(() => {
+    if (isMobileLandscape) {
+      setCalcMinimized(true);
+    }
+  }, [isMobileLandscape, mobileMinimizeResetKey]);
+
+  useEffect(() => {
+    if (isMobileLandscape) {
+      setCalcMinimized(true);
+    }
+  }, [isMobileLandscape, mobileWrongAnswerRevealKey]);
+
   function toggleCalc() {
     setCalcMinimized((m) => !m);
   }
 
   function handleKeypadSubmit() {
     onKeypadSubmit?.();
-    if (isMobileLandscape) {
-      setCalcMinimized(true);
-    }
   }
 
   async function handleShare() {
