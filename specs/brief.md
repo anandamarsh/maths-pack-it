@@ -139,5 +139,5 @@ Each level has 3 rounds, named:
 - Deviates from template default: **drag interaction in L1 Load** (template default is keypad only)
 - Fundamental scoring rule: max 1 point lost per question regardless of retry count or phantom use; question never advances until correct (documented in BA.md and must be implemented in template)
 - Fraction answers accepted as decimal (0.5) or fraction string (1/2) — both treated as correct
-- Dev server port: **4003**
+- Dev server port: **4005**
 - Game slug: **pack-it**

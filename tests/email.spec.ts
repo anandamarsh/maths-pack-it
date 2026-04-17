@@ -1,10 +1,10 @@
 // tests/email.spec.ts — Verifies the email report API sends successfully
 // Run: npx playwright test tests/email.spec.ts
-// Prerequisite: vercel dev running on http://localhost:3000
+// Prerequisite: local dev server running on http://localhost:4005
 
 import { test, expect } from "@playwright/test";
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:4005";
 const TEST_EMAIL = "amarsh.anand@gmail.com";
 
 test("sends report email via /api/send-report", async ({ request }) => {

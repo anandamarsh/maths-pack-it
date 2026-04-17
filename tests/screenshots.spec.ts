@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
 
 test("capture game screenshots", async ({ page }) => {
-  await page.goto("http://localhost:3000/");
+  await page.goto("http://localhost:4005/");
   await page.waitForSelector(".arcade-grid", { timeout: 5000 });
   await page.waitForTimeout(800);
 

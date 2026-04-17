@@ -7,8 +7,8 @@
 `maths-pack-it`
 
 ## Dev server port
-**4003**
-(distance-calculator = 4001, angle-explorer = 4002, pack-it = 4003)
+**4005**
+(distance-calculator = 4001, angle-explorer = 4002, pack-it = 4005)
 
 ## Live URL (placeholder)
 `https://maths-pack-it.vercel.app`
@@ -17,7 +17,7 @@
 ```
 VITE_GAME_SLUG=pack-it
 VITE_GAME_NAME=Pack It!
-VITE_DEV_PORT=4003
+VITE_DEV_PORT=4005
 VITE_DISQUS_SHORTNAME=interactive-maths
 ```
 

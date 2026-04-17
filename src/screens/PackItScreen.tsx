@@ -4143,6 +4143,7 @@ export default function PackItScreen() {
         chromeTheme={chromeTheme}
         mobileMinimizeResetKey={`${roundName}-${questionIndex}`}
         mobileWrongAnswerRevealKey={mobileWrongAnswerRevealKey}
+        desktopDragActive={Boolean(dragState?.isLifted)}
         levelCount={4}
         currentLevel={1}
         unlockedLevel={1}

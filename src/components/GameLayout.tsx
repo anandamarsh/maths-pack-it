@@ -109,6 +109,7 @@ interface GameLayoutProps {
   sceneBackdrop?: ReactNode;
   mobileMinimizeResetKey?: string | number;
   mobileWrongAnswerRevealKey?: string | number;
+  desktopDragActive?: boolean;
 
   // Game canvas
   children:
@@ -153,6 +154,7 @@ export default function GameLayout({
   sceneBackdrop,
   mobileMinimizeResetKey,
   mobileWrongAnswerRevealKey,
+  desktopDragActive = false,
   children,
   questionPanel,
 }: GameLayoutProps) {
@@ -233,6 +235,14 @@ export default function GameLayout({
       setCalcMinimized(false);
     }
   }, [autoExpandCalculator]);
+
+  useEffect(() => {
+    if (!desktopDragActive || isMobileLandscape || isCoarsePointer) {
+      return;
+    }
+
+    setCalcMinimized(true);
+  }, [desktopDragActive, isMobileLandscape, isCoarsePointer]);
 
   function toggleCalc() {
     setCalcMinimized((m) => !m);

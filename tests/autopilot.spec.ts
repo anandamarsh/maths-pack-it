@@ -16,7 +16,7 @@
 
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:4003";
+const BASE = "http://localhost:4005";
 
 // How long one full level takes at worst-case timing (ms):
 //   tap delays: 550 + 5×700 = 4050

@@ -704,7 +704,7 @@ The original manifest is restored after the build. The stamp uses Sydney local t
 
 | Script | Command | Description |
 |--------|---------|-------------|
-| Dev server | `npm run dev` | Starts Vite on port 4003 |
+| Dev server | `npm run dev` | Starts Vite on port 4005 |
 | Production build | `npm run build` | TypeScript check + Vite bundle + PWA |
 | Preview | `npm run preview` | Local preview of `/dist/` |
 | Lint | `npm run lint` | ESLint on `src/` |
@@ -716,7 +716,7 @@ The original manifest is restored after the build. The stamp uses Sydney local t
 | 4000 | interactive-maths shell |
 | 4001 | maths-distance-calculator |
 | 4002 | maths-angle-explorer |
-| 4003 | this template |
+| 4005 | this template |
 | 4004+ | custom games |
 
 ### 21.3 Deployment (Vercel)

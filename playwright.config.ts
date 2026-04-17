@@ -8,7 +8,7 @@ export default defineConfig({
   reporter: "list",
 
   use: {
-    baseURL: "http://localhost:4003",
+    baseURL: "http://localhost:4005",
     headless: false,           // show the browser so you can watch autopilot play
     viewport: { width: 1280, height: 800 },
     // Slow things down just enough to watch — remove for CI
@@ -21,7 +21,7 @@ export default defineConfig({
 
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:4003",
+    url: "http://localhost:4005",
     reuseExistingServer: true,  // use already-running dev server if available
     timeout: 30_000,
   },

@@ -6,7 +6,7 @@ A ready-to-run starting point for building games on the Interactive Maths platfo
 
 ```bash
 npm install
-npm run dev       # opens at http://localhost:4003
+npm run dev       # opens at http://localhost:4005
 ```
 
 ## What you get out of the box
@@ -88,7 +88,7 @@ Each game runs on its own local port:
 - `4000` — interactive-maths shell
 - `4001` — maths-distance-calculator
 - `4002` — maths-angle-explorer
-- `4003` — this template
+- `4005` — this template
 - `4004+` — your game (pick the next available)
 
 Update `vite.config.ts` `server.port` accordingly.

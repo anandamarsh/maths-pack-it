@@ -30,7 +30,7 @@ A complete, battle-tested game framework. The demo game "Ripple Touch" ships ins
 git clone https://github.com/anandamarsh/maths-game-template.git my-game
 cd my-game
 npm install
-npm run dev   # http://localhost:4003
+npm run dev   # http://localhost:4005
 ```
 
 ---
