@@ -1395,6 +1395,8 @@ export default function PackItScreen() {
   const [isGroupingPreviewAnimating, setIsGroupingPreviewAnimating] =
     useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+  const [showInsufficientItemNotice, setShowInsufficientItemNotice] =
+    useState(false);
   const [autoExpandCalculator, setAutoExpandCalculator] = useState(false);
   const nextComboIdRef = useRef(1);
   const containerRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -1771,6 +1773,16 @@ export default function PackItScreen() {
     );
   }
 
+  function revealInsufficientItemsState() {
+    setShowUnitReveal(false);
+    setQuestionSolved(false);
+    setFlash({ ok: false, icon: true });
+    setShowInsufficientItemNotice(true);
+    markQuestionPenalty();
+    revealWrongAnswerStateOnMobile();
+    playWrong();
+  }
+
   function finalizeQuestionReset() {
     clearPackHoldTimers();
     if (returnTimerRef.current !== null) {
@@ -1805,6 +1817,7 @@ export default function PackItScreen() {
     setDisplayTopBoxCount(0);
     setCalculatorInput("0");
     setCalculatorOverride(false);
+    setShowInsufficientItemNotice(false);
     setForceAnswerBanner(false);
     setIsCalculatorAdjusting(false);
     setIsContinuousAutopilot(false);
@@ -1914,6 +1927,7 @@ export default function PackItScreen() {
     setDisplayTopBoxCount(0);
     setCalculatorInput("0");
     setCalculatorOverride(false);
+    setShowInsufficientItemNotice(false);
     setForceAnswerBanner(false);
     setIsCalculatorAdjusting(false);
     setIsContinuousAutopilot(false);
@@ -1979,6 +1993,7 @@ export default function PackItScreen() {
     setDisplayTopBoxCount(0);
     setCalculatorInput("0");
     setCalculatorOverride(false);
+    setShowInsufficientItemNotice(false);
     setForceAnswerBanner(false);
     setIsCalculatorAdjusting(false);
     setIsContinuousAutopilot(preserveContinuousAutopilot);
@@ -2029,6 +2044,7 @@ export default function PackItScreen() {
     setDisplayTopBoxCount(0);
     setCalculatorInput("0");
     setCalculatorOverride(false);
+    setShowInsufficientItemNotice(false);
     setForceAnswerBanner(false);
     setIsCalculatorAdjusting(false);
     setIsContinuousAutopilot(false);
@@ -2458,8 +2474,12 @@ export default function PackItScreen() {
         targetTopCount - currentTopCount,
         maxAdditionalSteps,
       );
+      const isOverflowRequest = targetTopCount > currentTopCount + stepsToAdd;
       if (stepsToAdd === 0) {
         setIsCalculatorAdjusting(false);
+        if (isOverflowRequest) {
+          revealInsufficientItemsState();
+        }
         onComplete?.();
         return;
       }
@@ -2480,6 +2500,9 @@ export default function PackItScreen() {
         setIsCalculatorAdjusting(false);
         if (targetTopCount <= currentTopCount + stepsToAdd) {
           setCalculatorOverride(false);
+        }
+        if (isOverflowRequest) {
+          revealInsufficientItemsState();
         }
         onComplete?.();
       }, 560);
@@ -2512,6 +2535,7 @@ export default function PackItScreen() {
     const normalizedValue =
       digitsOnly === "" ? "0" : String(Number.parseInt(digitsOnly, 10));
 
+    setShowInsufficientItemNotice(false);
     setCalculatorInput(normalizedValue);
     setCalculatorOverride(true);
 
@@ -3138,6 +3162,11 @@ export default function PackItScreen() {
     if (question.round === "ship") {
       const submittedAnswer = Number.parseInt(calculatorInput, 10);
       applyCalculatorTarget(calculatorInput, () => {
+        if (submittedAnswer > question.totalA) {
+          revealInsufficientItemsState();
+          return;
+        }
+
         window.setTimeout(() => {
           const isCorrect = submittedAnswer === question.unitRate;
 
@@ -3189,6 +3218,7 @@ export default function PackItScreen() {
     }
 
     ensureMusic();
+    setShowInsufficientItemNotice(false);
     setReturnStates([]);
     const rect = event.currentTarget.getBoundingClientRect();
     const clickedItem = items.find((item) => item.id === itemId);
@@ -3835,6 +3865,7 @@ export default function PackItScreen() {
     setDisplayTopBoxCount(0);
     setCalculatorInput("0");
     setCalculatorOverride(false);
+    setShowInsufficientItemNotice(false);
     setForceAnswerBanner(false);
     setIsCalculatorAdjusting(false);
     clearKeypadAdjustTimers();
@@ -3893,6 +3924,7 @@ export default function PackItScreen() {
         }
         setCalculatorInput("0");
         setCalculatorOverride(false);
+        setShowInsufficientItemNotice(false);
         setDisplayTopBoxCount(0);
         continuousAutopilotStartIndexRef.current = questionIndex;
         setIsContinuousAutopilot(true);
@@ -4490,6 +4522,25 @@ export default function PackItScreen() {
                           paddingTop: `${sourcePaddingTop}px`,
                         }}
                       >
+                        {showInsufficientItemNotice &&
+                        remainingItems.length === 0 ? (
+                          <div className="pointer-events-none absolute inset-0 z-[4] flex items-center justify-center">
+                            <div
+                              className="rounded-2xl px-5 py-3 text-center font-arcade text-[1.2rem] font-bold leading-tight text-white"
+                              style={{
+                                background:
+                                  "linear-gradient(180deg, rgba(220,38,38,0.96), rgba(153,27,27,0.98))",
+                                border: "2px solid rgba(254,202,202,0.68)",
+                                boxShadow:
+                                  "0 0 18px rgba(239,68,68,0.52), 0 0 32px rgba(127,29,29,0.34), inset 0 1px 0 rgba(255,255,255,0.18)",
+                                textShadow:
+                                  "0 1px 0 rgba(127,29,29,0.65), 0 0 8px rgba(255,255,255,0.18)",
+                              }}
+                            >
+                              {`Insufficient ${question.pair.itemPlural}`}
+                            </div>
+                          </div>
+                        ) : null}
                         <div
                           className="flex min-h-[7rem] flex-wrap content-start justify-start"
                           style={{ gap: `${sourceGapPx}px` }}
