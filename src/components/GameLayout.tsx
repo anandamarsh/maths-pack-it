@@ -237,9 +237,6 @@ export default function GameLayout({
         ? "17.9rem"
         : "15.25rem";
   const dockTransition = "320ms cubic-bezier(0.22,0.72,0.2,1)";
-  const hideCanvasForExpandedMobileKeypad =
-    isMobileLandscape && !effectiveCalcMinimized;
-
   return (
     <div
       className="fixed inset-0 overflow-hidden flex flex-col arcade-grid"
@@ -638,9 +635,6 @@ export default function GameLayout({
           className="absolute left-0 right-0 top-0 overflow-hidden"
           style={{
             bottom: dockHeight,
-            opacity: hideCanvasForExpandedMobileKeypad ? 0 : 1,
-            pointerEvents: hideCanvasForExpandedMobileKeypad ? "none" : "auto",
-            visibility: hideCanvasForExpandedMobileKeypad ? "hidden" : "visible",
             transition: `bottom ${dockTransition}`,
           }}
         >

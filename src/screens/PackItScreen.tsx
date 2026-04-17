@@ -4016,7 +4016,11 @@ export default function PackItScreen() {
         unlockedLevel={1}
         questionPanel={questionPanel}
         sceneBackdrop={renderSceneAtmosphere(question.pair.item)}
-        children={() => (
+        children={({ calculatorMinimized }) => {
+          const hideSceneForExpandedMobileKeypad =
+            isMobileLandscape && !calculatorMinimized;
+
+          return (
           <div
             ref={rootRef}
             data-pack-it-capture-root="true"
@@ -4072,7 +4076,18 @@ export default function PackItScreen() {
                 </div>
               </div>
             </div>
-            <div className="flex h-full flex-col px-0 pb-0 pt-[3.6rem]">
+            <div
+              className="flex h-full flex-col px-0 pb-0 pt-[3.6rem]"
+              style={{
+                opacity: hideSceneForExpandedMobileKeypad ? 0 : 1,
+                pointerEvents: hideSceneForExpandedMobileKeypad
+                  ? "none"
+                  : "auto",
+                visibility: hideSceneForExpandedMobileKeypad
+                  ? "hidden"
+                  : "visible",
+              }}
+            >
               <div className="relative flex-1 overflow-hidden bg-transparent">
                 <div
                   ref={captureSceneRef}
@@ -4643,7 +4658,8 @@ export default function PackItScreen() {
 
             <PhantomHand pos={phantomPos} />
           </div>
-        )}
+          );
+        }}
       />
       {captureFlashVisible && (
         <div
