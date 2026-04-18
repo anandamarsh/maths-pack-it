@@ -18,7 +18,7 @@ const DESKTOP_ROUND_PROFILE: RoundGenerationProfile = {
   minTotalCount: 20,
   maxTotalCount: 80,
   maxGroupCount: 8,
-  maxUnitCount: 10,
+  maxUnitCount: 6,
 };
 
 function getLevelOneRoundProfile(isMobile: boolean): RoundGenerationProfile {

@@ -250,8 +250,11 @@ function DigitalCount({
 }) {
   return (
     <div
-      className="digital-meter rounded-lg px-3 py-1 text-[1.6rem] leading-none"
+      className="digital-meter rounded-2xl px-3 py-2 text-[1.6rem] leading-none"
       style={{
+        background: "#0f172a",
+        boxShadow:
+          "0 0 0 3px rgba(2,6,23,0.95), 0 10px 22px rgba(2,6,23,0.52)",
         color,
         textShadow: `0 0 12px ${glow}, 0 0 22px ${glowOuter}`,
       }}
@@ -1510,9 +1513,15 @@ export default function PackItScreen() {
   const containerStackLiftPx = 8;
   const containerStackGapPx = 8;
   const containerStackStepPx = itemSizePx + containerStackGapPx;
+  const desktopVisibleTubeCapacity = 6;
+  const visibleTubeCapacity = isMobileLandscape
+    ? question.unitRate
+    : Math.min(question.unitRate, desktopVisibleTubeCapacity);
   const containerInnerMinHeightPx =
-    itemSizePx + Math.max(0, question.unitRate - 1) * containerStackStepPx;
-  const containerMinHeightPx = isMobileLandscape ? 208 : 568;
+    itemSizePx + Math.max(0, visibleTubeCapacity - 1) * containerStackStepPx;
+  const containerMinHeightPx = isMobileLandscape
+    ? 208
+    : containerInnerMinHeightPx + containerPaddingY * 2 + containerStackLiftPx;
   const containerWidthPx = Math.max(
     itemSizePx + containerPaddingX * 2,
     Math.round(itemSizePx * 1.9),
@@ -4493,7 +4502,7 @@ export default function PackItScreen() {
                     ) : null}
                     {!isMobileLandscape ? (
                       <div
-                        className="pointer-events-none absolute left-0 right-0 z-[2]"
+                        className="pointer-events-none absolute left-0 right-0 z-[12]"
                         style={lowerCountsStyle}
                       >
                         <div className="flex">
