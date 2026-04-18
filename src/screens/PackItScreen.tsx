@@ -221,7 +221,9 @@ function ProgressApple({ active }: { active: boolean }) {
       className="inline-flex items-center justify-center leading-none transition-all duration-300"
       style={{
         fontSize: "1.45rem",
-        filter: active ? undefined : "grayscale(1) saturate(0) brightness(0.78)",
+        filter: active
+          ? undefined
+          : "grayscale(1) saturate(0) brightness(0.78)",
         opacity: active ? 1 : 0.72,
         transform: active ? "scale(1.04)" : "scale(0.96)",
         textShadow: active
@@ -252,16 +254,8 @@ function MobileLevelButton({
       disabled={locked}
       className="h-8 w-10 rounded-lg border-2 text-sm font-black transition-colors disabled:cursor-not-allowed"
       style={{
-        background: locked
-          ? "#0f172a"
-          : active
-            ? "#0ea5e9"
-            : "#1e293b",
-        borderColor: locked
-          ? "#1e293b"
-          : active
-            ? "#38bdf8"
-            : "#475569",
+        background: locked ? "#0f172a" : active ? "#0ea5e9" : "#1e293b",
+        borderColor: locked ? "#1e293b" : active ? "#38bdf8" : "#475569",
         color: locked ? "#64748b" : "#ffffff",
         opacity: locked ? 0.7 : 1,
       }}
@@ -1549,6 +1543,7 @@ export default function PackItScreen() {
   const questionTypeIntervalRef = useRef<number | null>(null);
   const stepTypeIntervalRef = useRef<number | null>(null);
   const stepTypeDelayRef = useRef<number | null>(null);
+  const desktopRevealStartTimerRef = useRef<number | null>(null);
   const desktopRevealTimerRef = useRef<number | null>(null);
   const desktopNextButtonTimerRef = useRef<number | null>(null);
   const displaySyncLockRef = useRef<number | null>(null);
@@ -1727,6 +1722,9 @@ export default function PackItScreen() {
       if (desktopRevealTimerRef.current !== null) {
         window.clearTimeout(desktopRevealTimerRef.current);
       }
+      if (desktopRevealStartTimerRef.current !== null) {
+        window.clearTimeout(desktopRevealStartTimerRef.current);
+      }
       if (desktopNextButtonTimerRef.current !== null) {
         window.clearTimeout(desktopNextButtonTimerRef.current);
       }
@@ -1806,8 +1804,12 @@ export default function PackItScreen() {
     const steps = question.blackboardSteps;
     if (isDesktopLayout) {
       setTypedStepLengths([]);
-      setDesktopRevealLineCount(1);
+      setDesktopRevealLineCount(0);
       setShowNextQuestionButton(false);
+      desktopRevealStartTimerRef.current = window.setTimeout(() => {
+        desktopRevealStartTimerRef.current = null;
+        setDesktopRevealLineCount(1);
+      }, 1000);
     } else {
       setTypedStepLengths(steps.map((line) => line.length));
       setShowNextQuestionButton(true);
@@ -1822,6 +1824,10 @@ export default function PackItScreen() {
         window.clearTimeout(stepTypeDelayRef.current);
         stepTypeDelayRef.current = null;
       }
+      if (desktopRevealStartTimerRef.current !== null) {
+        window.clearTimeout(desktopRevealStartTimerRef.current);
+        desktopRevealStartTimerRef.current = null;
+      }
       if (desktopRevealTimerRef.current !== null) {
         window.clearTimeout(desktopRevealTimerRef.current);
         desktopRevealTimerRef.current = null;
@@ -1831,7 +1837,12 @@ export default function PackItScreen() {
         desktopNextButtonTimerRef.current = null;
       }
     };
-  }, [isDesktopLayout, question.blackboardSteps, questionResetKey, showUnitReveal]);
+  }, [
+    isDesktopLayout,
+    question.blackboardSteps,
+    questionResetKey,
+    showUnitReveal,
+  ]);
 
   useEffect(() => {
     if (!isDesktopLayout || !showUnitReveal) {
@@ -1839,8 +1850,14 @@ export default function PackItScreen() {
     }
 
     const totalLines = question.blackboardSteps.length;
+    if (desktopRevealLineCount <= 0) {
+      return;
+    }
     if (desktopRevealLineCount >= totalLines) {
-      if (showNextQuestionButton || desktopNextButtonTimerRef.current !== null) {
+      if (
+        showNextQuestionButton ||
+        desktopNextButtonTimerRef.current !== null
+      ) {
         return;
       }
 
@@ -1860,6 +1877,10 @@ export default function PackItScreen() {
       if (desktopRevealTimerRef.current !== null) {
         window.clearTimeout(desktopRevealTimerRef.current);
         desktopRevealTimerRef.current = null;
+      }
+      if (desktopRevealStartTimerRef.current !== null) {
+        window.clearTimeout(desktopRevealStartTimerRef.current);
+        desktopRevealStartTimerRef.current = null;
       }
       if (desktopNextButtonTimerRef.current !== null) {
         window.clearTimeout(desktopNextButtonTimerRef.current);
@@ -4637,7 +4658,7 @@ export default function PackItScreen() {
               style={{ touchAction: "none" }}
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center pt-[4px]">
-              <div className="pointer-events-auto flex flex-col items-center gap-2">
+                <div className="pointer-events-auto flex flex-col items-center gap-2">
                   <div
                     className="flex items-center gap-2"
                     style={{
@@ -4899,14 +4920,19 @@ export default function PackItScreen() {
                                 style={{ gap: "0.35rem" }}
                               >
                                 {question.blackboardSteps.map((line, index) => (
-                                  <div key={`desktop-answer-${index}`} className="w-full">
+                                  <div
+                                    key={`desktop-answer-${index}`}
+                                    className="w-full"
+                                  >
                                     <div
                                       className="font-arcade w-full font-semibold leading-relaxed"
                                       style={{
                                         fontSize: "1.15rem",
                                         color: chromeTheme.messagePanel.text,
                                         opacity:
-                                          index < desktopRevealLineCount ? 1 : 0,
+                                          index < desktopRevealLineCount
+                                            ? 1
+                                            : 0,
                                         transition:
                                           "opacity 220ms cubic-bezier(0.22,0.72,0.2,1)",
                                         textShadow:
@@ -4933,7 +4959,9 @@ export default function PackItScreen() {
                                           borderTop:
                                             "2px solid rgba(148,163,184,0.35)",
                                           opacity:
-                                            index < desktopRevealLineCount ? 1 : 0,
+                                            index < desktopRevealLineCount
+                                              ? 1
+                                              : 0,
                                           transition:
                                             "opacity 220ms cubic-bezier(0.22,0.72,0.2,1)",
                                         }}

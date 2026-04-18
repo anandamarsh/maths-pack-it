@@ -11,7 +11,7 @@ import type {
 const MOBILE_ROUND_PROFILE: RoundGenerationProfile = {
   minTotalCount: 20,
   maxTotalCount: 40,
-  maxGroupCount: 8,
+  maxGroupCount: 7,
   maxUnitCount: 5,
 };
 

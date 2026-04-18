@@ -11,18 +11,18 @@
   "theme_color": "#0d1b35",
   "description": "Build: __BUILD_STAMP__\n\nPack It! is an Interactive Maths game about the unitary method. Children pack items into equal groups, see the unit rate emerge on a blackboard, and then use that rate to solve scaling problems.",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
+      "src": "icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "screenshots": [

@@ -808,7 +808,13 @@ export default function GameLayout({
               }}
             >
               {renderedQuestionPanel ? (
-                <div className="flex-1 min-w-0 pointer-events-auto">
+                <div
+                  className="flex-1 min-w-0 pointer-events-auto"
+                  style={{
+                    height: isMobileLandscape ? "100%" : "calc(100% + 4px)",
+                    alignSelf: "flex-start",
+                  }}
+                >
                   {renderedQuestionPanel}
                 </div>
               ) : null}
