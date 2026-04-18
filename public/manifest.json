@@ -25,6 +25,13 @@
       "purpose": "any maskable"
     }
   ],
+  "level-icons": [
+    {
+      "level": 1,
+      "src": "level-icons/level-1.png",
+      "type": "image/png"
+    }
+  ],
   "screenshots": [
     {
       "src": "/screenshots/pack-it-screenshot-1.jpg",
