@@ -79,6 +79,7 @@ interface GameLayoutProps {
         calculatorMinimized: boolean;
         toggleCalculatorMinimized: () => void;
       }) => ReactNode);
+  desktopRailTop?: ReactNode;
   questionShake?: boolean;
 
   // Progress dots (optional)
@@ -111,7 +112,6 @@ interface GameLayoutProps {
   sceneBackdrop?: ReactNode;
   mobileMinimizeResetKey?: string | number;
   mobileWrongAnswerRevealKey?: string | number;
-  desktopDragActive?: boolean;
 
   // Game canvas
   children:
@@ -157,19 +157,24 @@ export default function GameLayout({
   sceneBackdrop,
   mobileMinimizeResetKey,
   mobileWrongAnswerRevealKey,
-  desktopDragActive = false,
   children,
   questionPanel,
+  desktopRailTop,
 }: GameLayoutProps) {
   const t = useT();
   const isMobileLandscape = useIsMobileLandscape();
   const isCoarsePointer = useIsCoarsePointer();
+  const isDesktopLayout = !isCoarsePointer;
   // Minimized by default on touch devices; expanded by default on desktop
   const [calcMinimized, setCalcMinimized] = useState(
     () => isMobileLandscape || isCoarsePointer,
   );
-  // Effective minimized state: autopilot forces expansion when needed
-  const effectiveCalcMinimized = forceKeypadExpanded ? false : calcMinimized;
+  // Desktop always stays expanded; minimize behavior is mobile-only.
+  const effectiveCalcMinimized = isDesktopLayout
+    ? false
+    : forceKeypadExpanded
+      ? false
+      : calcMinimized;
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareDrawerOpen, setShareDrawerOpen] = useState(false);
   const [youtubeBubbleDismissed, setYoutubeBubbleDismissed] = useState(
@@ -239,15 +244,10 @@ export default function GameLayout({
     }
   }, [autoExpandCalculator]);
 
-  useEffect(() => {
-    if (!desktopDragActive || isMobileLandscape || isCoarsePointer) {
+  function toggleCalc() {
+    if (isDesktopLayout) {
       return;
     }
-
-    setCalcMinimized(true);
-  }, [desktopDragActive, isMobileLandscape, isCoarsePointer]);
-
-  function toggleCalc() {
     setCalcMinimized((m) => !m);
   }
 
@@ -300,6 +300,57 @@ export default function GameLayout({
         ? "17.9rem"
         : "15.25rem";
   const dockTransition = "320ms cubic-bezier(0.22,0.72,0.2,1)";
+  const desktopRailWidth = "17rem";
+  const leftCanvasTopInset = "0";
+  const renderedQuestionPanel =
+    questionPanel !== undefined
+      ? typeof questionPanel === "function"
+        ? questionPanel({
+            calculatorMinimized: effectiveCalcMinimized,
+            toggleCalculatorMinimized: toggleCalc,
+          })
+        : questionPanel
+      : question !== undefined
+        ? (
+            <QuestionBox
+              shake={questionShake}
+              onClick={toggleCalc}
+              style={chromeTheme?.questionBoxStyle}
+            >
+              {question}
+            </QuestionBox>
+          )
+        : null;
+  const renderedCalculator = !hideKeypad ? (
+    <div className="flex h-full min-h-0 flex-col justify-end self-stretch pointer-events-auto">
+      {calculatorTopBanner ? (
+        <div
+          className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"
+          style={{
+            background: "rgba(250,204,21,0.12)",
+            borderColor: "#facc15",
+            borderWidth: "3px",
+            color: "#fde047",
+            marginBottom: "2px",
+            ...chromeTheme?.calculatorBannerStyle,
+          }}
+        >
+          {calculatorTopBanner}
+        </div>
+      ) : null}
+      <NumericKeypad
+        value={keypadValue}
+        onChange={onKeypadChange}
+        onKeyInput={onKeypadKeyInput}
+        onSubmit={handleKeypadSubmit}
+        onEnterPress={onKeypadEnterPress}
+        canSubmit={canSubmit}
+        minimized={effectiveCalcMinimized}
+        onToggleMinimized={toggleCalc}
+        theme={chromeTheme?.keypadTheme}
+      />
+    </div>
+  ) : null;
   return (
     <div
       className="fixed inset-0 overflow-hidden flex flex-col arcade-grid"
@@ -572,7 +623,13 @@ export default function GameLayout({
 
         <div
           className="social-launchers pointer-events-auto"
-          style={!isCoarsePointer ? { top: "0.5rem" } : undefined}
+          style={
+            isDesktopLayout
+              ? { display: "none" }
+              : !isCoarsePointer
+                ? { top: "0.5rem" }
+                : undefined
+          }
         >
           <LanguageSwitcher />
 
@@ -691,118 +748,191 @@ export default function GameLayout({
         </div>
       </div>
 
-      {/* ── Rest: canvas (absolute) + floating bottom bar ───────────────── */}
-      <div className="relative z-[1] flex-1 min-h-0 mx-0 mb-0">
-        {/* Canvas — always fills the full rest area */}
-        <div
-          className="absolute left-0 right-0 top-0 overflow-hidden"
-          style={{
-            bottom: dockHeight,
-            transition: `bottom ${dockTransition}`,
-          }}
-        >
-          {typeof children === "function"
-            ? children({
-                calculatorMinimized: effectiveCalcMinimized,
-                toggleCalculatorMinimized: toggleCalc,
-              })
-            : children}
-        </div>
-
-        {demoBanner ? (
+      {/* ── Rest: canvas + desktop rail / mobile dock ───────────────────── */}
+      <div className="relative z-[1] flex flex-1 min-h-0 mx-0 mb-0">
+        <div className="relative flex-1 min-h-0">
           <div
-            className={`pointer-events-none absolute z-[58] flex ${
-              isMobileLandscape
-                ? "bottom-20 left-0 top-0 w-12 items-center justify-start"
-                : "left-2 right-2 top-2 justify-center"
-            }`}
+            className="absolute left-0 right-0 overflow-hidden"
+            style={{
+              top: leftCanvasTopInset,
+              bottom: isDesktopLayout ? 0 : dockHeight,
+              transition: `bottom ${dockTransition}, top ${dockTransition}`,
+            }}
           >
-            <div
-              className={
-                isMobileLandscape
-                  ? "rounded-r-2xl rounded-l-none px-1.5 py-3 text-center"
-                  : "max-w-2xl rounded-2xl px-5 py-1.5 text-center"
-              }
-              style={{
-                background: "#09104c",
-                border: "1px solid rgba(96, 165, 250, 0.75)",
-                color: "#ffffff",
-                boxShadow:
-                  "0 0 24px rgba(96,165,250,0.38), 0 0 44px rgba(59,130,246,0.2)",
-                writingMode: isMobileLandscape ? "vertical-rl" : undefined,
-                textOrientation: isMobileLandscape ? "upright" : undefined,
-              }}
-            >
-              {demoBanner}
-            </div>
+            {typeof children === "function"
+              ? children({
+                  calculatorMinimized: effectiveCalcMinimized,
+                  toggleCalculatorMinimized: toggleCalc,
+                })
+              : children}
           </div>
-        ) : null}
 
-        {/* Bottom overlay — floats over canvas, anchored to bottom */}
-        <div
-          className="absolute z-[90] flex flex-row items-stretch gap-2 pointer-events-auto"
-          style={{
-            bottom: "3px",
-            left: "2px",
-            right: "2px",
-            height: dockHeight,
-            transition: `height ${dockTransition}`,
-          }}
-        >
-          {/* Message box — same height as calculator, click = toggle */}
-          {questionPanel !== undefined ? (
-            <div className="flex-1 min-w-0 pointer-events-auto">
-              {typeof questionPanel === "function"
-                ? questionPanel({
-                    calculatorMinimized: effectiveCalcMinimized,
-                    toggleCalculatorMinimized: toggleCalc,
-                  })
-                : questionPanel}
-            </div>
-          ) : question !== undefined ? (
-            <div className="flex-1 min-w-0 pointer-events-auto">
-              <QuestionBox
-                shake={questionShake}
-                onClick={toggleCalc}
-                style={chromeTheme?.questionBoxStyle}
+          {demoBanner ? (
+            <div
+              className={`pointer-events-none absolute z-[58] flex ${
+                isMobileLandscape
+                  ? "bottom-20 left-0 top-0 w-12 items-center justify-start"
+                  : "left-2 right-2 top-2 justify-center"
+              }`}
+            >
+              <div
+                className={
+                  isMobileLandscape
+                    ? "rounded-r-2xl rounded-l-none px-1.5 py-3 text-center"
+                    : "max-w-2xl rounded-2xl px-5 py-1.5 text-center"
+                }
+                style={{
+                  background: "#09104c",
+                  border: "1px solid rgba(96, 165, 250, 0.75)",
+                  color: "#ffffff",
+                  boxShadow:
+                    "0 0 24px rgba(96,165,250,0.38), 0 0 44px rgba(59,130,246,0.2)",
+                  writingMode: isMobileLandscape ? "vertical-rl" : undefined,
+                  textOrientation: isMobileLandscape ? "upright" : undefined,
+                }}
               >
-                {question}
-              </QuestionBox>
+                {demoBanner}
+              </div>
             </div>
           ) : null}
 
-          {/* Calculator */}
-          {!hideKeypad && (
-            <div className="flex h-full min-h-0 flex-col justify-end self-stretch pointer-events-auto">
-              {calculatorTopBanner ? (
-                <div
-                  className="arcade-panel px-3 py-2 text-center text-[1rem] font-bold leading-tight text-white"
-                  style={{
-                    background: "rgba(250,204,21,0.12)",
-                    borderColor: "#facc15",
-                    borderWidth: "3px",
-                    color: "#fde047",
-                    marginBottom: "2px",
-                    ...chromeTheme?.calculatorBannerStyle,
-                  }}
-                >
-                  {calculatorTopBanner}
+          {!isDesktopLayout && (
+            <div
+              className="absolute z-[90] flex flex-row items-stretch gap-2 pointer-events-auto"
+              style={{
+                bottom: "3px",
+                left: "2px",
+                right: "2px",
+                height: dockHeight,
+                transition: `height ${dockTransition}`,
+              }}
+            >
+              {renderedQuestionPanel ? (
+                <div className="flex-1 min-w-0 pointer-events-auto">
+                  {renderedQuestionPanel}
                 </div>
               ) : null}
-              <NumericKeypad
-                value={keypadValue}
-                onChange={onKeypadChange}
-                onKeyInput={onKeypadKeyInput}
-                onSubmit={handleKeypadSubmit}
-                onEnterPress={onKeypadEnterPress}
-                canSubmit={canSubmit}
-                minimized={effectiveCalcMinimized}
-                onToggleMinimized={toggleCalc}
-                theme={chromeTheme?.keypadTheme}
-              />
+              {renderedCalculator}
             </div>
           )}
         </div>
+
+        {isDesktopLayout && (
+          <aside
+            className="relative z-[65] flex h-full shrink-0 flex-col px-2 pb-3 pt-3"
+            style={{
+              width: desktopRailWidth,
+              background:
+                "linear-gradient(180deg, rgba(4,12,28,0.94), rgba(2,6,23,0.98))",
+              borderLeft: "1px solid rgba(148,163,184,0.14)",
+              boxShadow:
+                "inset 12px 0 24px rgba(2,6,23,0.34), inset 0 0 0 1px rgba(51,65,85,0.18)",
+            }}
+          >
+            <div className="mb-3 flex items-start justify-end">
+              <div className="social-launchers relative top-0 right-0 gap-1.5">
+                <LanguageSwitcher />
+
+                {onQuestionDemo && (
+                  <AutopilotIcon
+                    onClick={onQuestionDemo}
+                    active={isQuestionDemo}
+                    title={t("toolbar.showSolve")}
+                    ariaLabel={t("toolbar.showSolve")}
+                  />
+                )}
+
+                <button
+                  onClick={handleShare}
+                  title={t("toolbar.share")}
+                  className={`social-launcher arcade-button ${shareDrawerOpen ? "is-active" : ""}`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="social-launcher-icon"
+                  >
+                    <circle cx="18" cy="5" r="3" stroke="white" strokeWidth="2" />
+                    <circle cx="6" cy="12" r="3" stroke="white" strokeWidth="2" />
+                    <circle cx="18" cy="19" r="3" stroke="white" strokeWidth="2" />
+                    <line
+                      x1="8.59"
+                      y1="13.51"
+                      x2="15.42"
+                      y2="17.49"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <line
+                      x1="15.41"
+                      y1="6.51"
+                      x2="8.59"
+                      y2="10.49"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={() => setCommentsOpen((o) => !o)}
+                  title={t("toolbar.comments")}
+                  className={`social-launcher arcade-button ${commentsOpen ? "is-active" : ""}`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="social-launcher-icon"
+                  >
+                    <path
+                      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {youtubeEmbedUrl && (
+                  <button
+                    type="button"
+                    title="Watch how to play"
+                    aria-label="Watch how to play"
+                    className={`social-video-button ${youtubeModalOpen ? "is-active" : ""}`}
+                    onClick={() => setYoutubeModalOpen(true)}
+                  >
+                    <img
+                      src={YOUTUBE_ICON_URL}
+                      alt="YouTube"
+                      className="social-launcher-icon social-launcher-image"
+                    />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {desktopRailTop ? (
+              <div className="mb-3 px-1 pt-2">
+                {desktopRailTop}
+              </div>
+            ) : null}
+
+            {renderedQuestionPanel ? (
+              <div className="min-h-0 flex-1 overflow-hidden pb-3">
+                {renderedQuestionPanel}
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+
+            {renderedCalculator ? (
+              <div className="mt-auto">{renderedCalculator}</div>
+            ) : null}
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -197,10 +197,9 @@ const RETURN_ANIMATION_MS = 220;
 const PACK_HOLD_DELAY_MS = 300;
 const PACK_HOLD_INTERVAL_MS = 150;
 const SHIP_RESULT_DELAY_MS = 500;
-const DESKTOP_DOCK_HEIGHT_PX = 15.25 * 16;
 const DESKTOP_TUBE_MIN_CAPACITY = 6;
-const DESKTOP_TUBE_MAX_CAPACITY = 11;
-const DESKTOP_TUBE_VERTICAL_RESERVE_PX = 100;
+const DESKTOP_TUBE_MAX_CAPACITY = 10;
+const DESKTOP_RIGHT_RAIL_WIDTH_PX = 17 * 16;
 const DESKTOP_GROUP_MIN_CAPACITY = 4;
 const DESKTOP_GROUP_MAX_CAPACITY = 8;
 const ROUND_LABELS: Record<RoundName, string> = {
@@ -210,13 +209,31 @@ const ROUND_LABELS: Record<RoundName, string> = {
 };
 const ROUND_SEQUENCE: RoundName[] = ["load", "pack", "ship"];
 
-function getDesktopTubeCapacityForSceneHeight(sceneHeight: number) {
-  const availableTubeHeight = Math.max(
-    0,
-    sceneHeight - DESKTOP_TUBE_VERTICAL_RESERVE_PX,
+function ProgressApple({ active }: { active: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex items-center justify-center leading-none transition-all duration-300"
+      style={{
+        fontSize: "1.45rem",
+        filter: active ? undefined : "grayscale(1) saturate(0) brightness(0.78)",
+        opacity: active ? 1 : 0.72,
+        transform: active ? "scale(1.04)" : "scale(0.96)",
+        textShadow: active
+          ? "0 0 10px rgba(239,68,68,0.32)"
+          : "0 0 6px rgba(100,116,139,0.18)",
+      }}
+    >
+      🍎
+    </span>
   );
+}
+
+function getDesktopTubeCapacityForSceneHeight(sceneHeight: number) {
   const itemSizePx = 48;
   const stackStepPx = itemSizePx + 8;
+  const topGapPx = stackStepPx;
+  const availableTubeHeight = Math.max(0, sceneHeight - topGapPx);
   const estimatedCapacity =
     Math.floor(Math.max(0, availableTubeHeight - itemSizePx) / stackStepPx) + 1;
 
@@ -248,6 +265,10 @@ function getDesktopGroupCapacityForSceneWidth(sceneWidth: number) {
     DESKTOP_GROUP_MIN_CAPACITY,
     Math.min(DESKTOP_GROUP_MAX_CAPACITY, estimatedCapacity),
   );
+}
+
+function getDesktopPlayfieldWidth(viewportWidth: number) {
+  return Math.max(0, viewportWidth - DESKTOP_RIGHT_RAIL_WIDTH_PX);
 }
 
 function renderHighlightedQuestion(
@@ -1398,14 +1419,14 @@ export default function PackItScreen() {
   const [desktopGroupCapacity, setDesktopGroupCapacity] = useState(() =>
     typeof window === "undefined"
       ? DESKTOP_GROUP_MAX_CAPACITY
-      : getDesktopGroupCapacityForSceneWidth(window.innerWidth),
+      : getDesktopGroupCapacityForSceneWidth(
+          getDesktopPlayfieldWidth(window.innerWidth),
+        ),
   );
   const [desktopTubeCapacity, setDesktopTubeCapacity] = useState(() =>
     typeof window === "undefined"
       ? DESKTOP_TUBE_MAX_CAPACITY
-      : getDesktopTubeCapacityForSceneHeight(
-          Math.max(0, window.innerHeight - DESKTOP_DOCK_HEIGHT_PX),
-        ),
+      : getDesktopTubeCapacityForSceneHeight(window.innerHeight),
   );
   const [roundName, setRoundName] = useState<RoundName>("load");
   const round = useMemo(
@@ -1507,13 +1528,10 @@ export default function PackItScreen() {
     }
 
     const measureDesktopTubeCapacity = () => {
-      const sceneHeight = Math.max(
-        0,
-        window.innerHeight - DESKTOP_DOCK_HEIGHT_PX,
-      );
+      const sceneHeight = Math.max(0, window.innerHeight);
       const nextCapacity = getDesktopTubeCapacityForSceneHeight(sceneHeight);
       const nextGroupCapacity = getDesktopGroupCapacityForSceneWidth(
-        window.innerWidth,
+        getDesktopPlayfieldWidth(window.innerWidth),
       );
       setDesktopGroupCapacity((current) =>
         current === nextGroupCapacity ? current : nextGroupCapacity,
@@ -1533,6 +1551,7 @@ export default function PackItScreen() {
 
   const question = round.questions[questionIndex];
   const isTapFillRound = question.round === "pack" || question.round === "ship";
+  const isDesktopLayout = !isMobile;
   const containers = Array.from({ length: question.groupsA }, (_, index) =>
     items
       .filter((item) => item.containerIndex === index)
@@ -1598,9 +1617,13 @@ export default function PackItScreen() {
   );
   const containerGapPx = Math.max(4, Math.round(itemSizePx * 0.16));
   const sourcePaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
-  const sourcePaddingTop = Math.max(10, Math.round(itemSizePx * 0.25));
+  const sourcePaddingTop = isDesktopLayout
+    ? 0
+    : Math.max(10, Math.round(itemSizePx * 0.25));
   const containerColumnPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
-  const containerColumnPaddingTop = Math.max(2, Math.round(itemSizePx * 0.08));
+  const containerColumnPaddingTop = isDesktopLayout
+    ? 0
+    : Math.max(2, Math.round(itemSizePx * 0.08));
   const containerPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
   const containerPaddingY = Math.max(4, Math.round(itemSizePx * 0.08));
   const containerStackLiftPx = 8;
@@ -1619,7 +1642,7 @@ export default function PackItScreen() {
     Math.round(itemSizePx * 1.9),
   );
   const containerStripGapPx = Math.max(18, Math.round(itemSizePx * 0.8));
-  const containerStripBottomOffsetPx = isMobileLandscape ? 10 : 12;
+  const containerStripBottomOffsetPx = isMobileLandscape ? 10 : 0;
   const containerSnapZonePaddingPx = Math.max(
     18,
     Math.round(itemSizePx * 0.55),
@@ -4288,7 +4311,7 @@ export default function PackItScreen() {
         <div
           className="relative font-arcade flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border-[3px]"
           style={{
-            background: messageTheme.outerBackground,
+            background: messageTheme.headerBackground,
             borderColor: messageTheme.outerBorder,
             boxShadow: messageTheme.outerShadow,
           }}
@@ -4313,7 +4336,7 @@ export default function PackItScreen() {
                 calculatorMinimized && showBoxCornerCta ? "5.5rem" : undefined,
               transition: `min-height ${DOCK_TRANSITION}, padding ${DOCK_TRANSITION}`,
               letterSpacing: "0.015em",
-              background: messageTheme.headerBackground,
+              background: "transparent",
               color: messageTheme.text,
               whiteSpace: "normal",
               overflowWrap: "normal",
@@ -4330,21 +4353,18 @@ export default function PackItScreen() {
           <div
             className="flex-1"
             style={{
-              background: messageTheme.bodyBackground,
+              background: "transparent",
               maxHeight: calculatorMinimized ? "0px" : "14rem",
               opacity: calculatorMinimized ? 0 : 1,
               overflow: "hidden",
               transition: `max-height ${DOCK_TRANSITION}, opacity ${DOCK_TRANSITION}`,
             }}
           >
-            <div
-              className="border-t"
-              style={{ borderColor: messageTheme.divider }}
-            />
+            <div className="border-t" style={{ borderColor: "transparent" }} />
             <div
               className="min-h-[5.6rem] h-full px-5 py-4 text-[1.05rem] font-semibold leading-relaxed"
               style={{
-                background: messageTheme.bodyBackground,
+                background: "transparent",
                 color: messageTheme.text,
                 paddingBottom: showBoxCornerCta ? "3.5rem" : undefined,
                 paddingRight: showBoxCornerCta ? "6.25rem" : undefined,
@@ -4392,6 +4412,32 @@ export default function PackItScreen() {
     );
   };
 
+  const desktopRailTop = isDesktopLayout ? (
+    <div
+      className="grid grid-cols-5 gap-x-2 gap-y-3 justify-items-center"
+      style={{ paddingTop: "3rem" }}
+    >
+      {Array.from({ length: progressTotal }, (_, index) => {
+        const filled = index < autopilotProgress;
+        return (
+          <button
+            key={index}
+            type="button"
+            onClick={() => handleDevProgressDotClick(index)}
+            disabled={!import.meta.env.DEV}
+            className="inline-flex h-7 w-7 items-center justify-center transition-all duration-300 disabled:cursor-default"
+            style={{
+              transform: filled ? "scale(1.05)" : "scale(1)",
+              cursor: import.meta.env.DEV ? "pointer" : "default",
+            }}
+          >
+            <ProgressApple active={filled} />
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
   return (
     <>
       <GameLayout
@@ -4422,11 +4468,11 @@ export default function PackItScreen() {
         chromeTheme={chromeTheme}
         mobileMinimizeResetKey={`${roundName}-${questionIndex}`}
         mobileWrongAnswerRevealKey={mobileWrongAnswerRevealKey}
-        desktopDragActive={Boolean(dragState?.isLifted)}
         levelCount={4}
         currentLevel={1}
         unlockedLevel={1}
         questionPanel={questionPanel}
+        desktopRailTop={desktopRailTop}
         sceneBackdrop={renderSceneAtmosphere(question.pair.item)}
         children={({ calculatorMinimized }) => {
           const hideSceneForExpandedMobileKeypad =
@@ -4444,37 +4490,15 @@ export default function PackItScreen() {
               style={{ touchAction: "none" }}
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center pt-[4px]">
-                <div className="pointer-events-auto flex flex-col items-center gap-0">
-                  <div className="inline-flex items-center gap-2 rounded-full px-2 py-1">
-                    {(["load", "pack", "ship"] as const).map(
-                      (candidateRound) => {
-                        const isActive = candidateRound === roundName;
-                        return (
-                          <button
-                            key={candidateRound}
-                            type="button"
-                            onClick={() => handleRoundChange(candidateRound)}
-                            className="rounded-full border-[3px] px-3 py-1 font-arcade text-[0.8rem] font-bold uppercase tracking-[0.08em] text-white transition-all duration-150 hover:scale-[1.03] active:scale-[0.98]"
-                            style={{
-                              borderColor: isActive
-                                ? "#67e8f9"
-                                : "rgba(100,116,139,0.7)",
-                              background: isActive
-                                ? "rgba(8,47,73,0.96)"
-                                : "rgba(15,23,42,0.78)",
-                              color: isActive ? "#67e8f9" : "#e2e8f0",
-                              boxShadow: isActive
-                                ? "0 0 16px rgba(103,232,249,0.24)"
-                                : "none",
-                            }}
-                          >
-                            {ROUND_LABELS[candidateRound]}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-                  <div className="mt-[4px] flex items-center justify-center gap-1.5">
+              <div className="pointer-events-auto flex flex-col items-center gap-0">
+                  <div
+                    className="mt-[4px] flex items-center justify-center gap-1.5"
+                    style={{
+                      opacity: isDesktopLayout ? 0 : 1,
+                      pointerEvents: isDesktopLayout ? "none" : "auto",
+                      visibility: isDesktopLayout ? "hidden" : "visible",
+                    }}
+                  >
                     {Array.from({ length: progressTotal }, (_, index) => {
                       const filled = index < autopilotProgress;
                       return (
@@ -4483,27 +4507,23 @@ export default function PackItScreen() {
                           type="button"
                           onClick={() => handleDevProgressDotClick(index)}
                           disabled={!import.meta.env.DEV}
-                          className="h-3.5 w-3.5 rounded-full border-2 transition-all duration-300 disabled:cursor-default"
+                          className="inline-flex h-7 w-7 items-center justify-center transition-all duration-300 disabled:cursor-default"
                           style={{
-                            background: filled ? "#67e8f9" : "transparent",
-                            borderColor: filled
-                              ? "#67e8f9"
-                              : "rgba(255,255,255,0.26)",
-                            boxShadow: filled
-                              ? "0 0 8px rgba(103,232,249,0.8)"
-                              : undefined,
-                            transform: filled ? "scale(1.15)" : "scale(1)",
+                            transform: filled ? "scale(1.05)" : "scale(1)",
                             cursor: import.meta.env.DEV ? "pointer" : "default",
                           }}
-                        />
+                        >
+                          <ProgressApple active={filled} />
+                        </button>
                       );
                     })}
                   </div>
                 </div>
               </div>
               <div
-                className="flex h-full flex-col px-0 pb-0 pt-[3.6rem]"
+                className="flex h-full flex-col px-0 pb-0"
                 style={{
+                  paddingTop: isDesktopLayout ? 0 : "3.6rem",
                   opacity: hideSceneForExpandedMobileKeypad ? 0 : 1,
                   pointerEvents: hideSceneForExpandedMobileKeypad
                     ? "none"
@@ -4593,14 +4613,15 @@ export default function PackItScreen() {
                       </div>
                     ) : null}
                     <div
-                      className="relative z-[3] grid h-full gap-0 px-0 pb-0 pt-7"
+                      className="relative z-[3] grid h-full gap-0 px-0 pb-0"
                       style={{
+                        paddingTop: isDesktopLayout ? 0 : "1.75rem",
                         gridTemplateColumns: `${sourcePanelWidthPercent}% ${containerPanelWidthPercent}%`,
                       }}
                     >
                       <div
                         ref={sourceAreaRef}
-                        className="relative h-full bg-transparent"
+                        className="relative flex h-full items-center bg-transparent"
                         style={{
                           boxShadow: "none",
                           paddingLeft: `${sourcePaddingX}px`,
@@ -4703,20 +4724,23 @@ export default function PackItScreen() {
                       </div>
 
                       <div
-                        className="flex items-end justify-center"
+                        className="flex justify-center"
                         style={{
+                          height: isDesktopLayout ? "100%" : undefined,
                           gap: `${containerStripGapPx}px`,
                           paddingLeft: `${containerColumnPaddingX}px`,
                           paddingRight: `${containerColumnPaddingX}px`,
                           paddingTop: `${containerColumnPaddingTop}px`,
                           paddingBottom: `${containerStripBottomOffsetPx}px`,
+                          alignItems: isDesktopLayout ? "center" : "flex-end",
                         }}
                       >
                         <div
-                          className="flex items-end justify-center"
+                          className="flex justify-center"
                           style={{
                             gap: `${containerStripGapPx}px`,
                             background: "transparent",
+                            alignItems: isDesktopLayout ? "center" : "flex-end",
                           }}
                         >
                           {containers.map((containerItems, index) =>

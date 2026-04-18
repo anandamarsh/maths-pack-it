@@ -53,6 +53,7 @@ export default function NumericKeypad({
 }: NumericKeypadProps) {
   const isCoarsePointer = useIsCoarsePointer();
   const isMobileLandscape = useIsMobileLandscape();
+  const isDesktopLayout = !isCoarsePointer;
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const activeKeyTimeoutRef = useRef<number | null>(null);
 
@@ -84,15 +85,23 @@ export default function NumericKeypad({
 
   const display = value === "" ? "0" : value;
   const rows = [["7", "8", "9", "⌫"], ["4", "5", "6", "±"], ["1", "2", "3", "."]];
-  const buttonHeightClass = isMobileLandscape ? "h-[56px]" : isCoarsePointer ? "h-[45px]" : "h-[55px] md:h-10";
-  const base = `rounded flex cursor-pointer items-center justify-center font-black select-none transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${isMobileLandscape ? "text-[1.6875rem]" : "text-[1.5rem] md:text-[1.3125rem]"} ${buttonHeightClass}`;
-  const digit = `${base} ${isMobileLandscape ? "text-[1.875rem]" : "text-[1.7rem] md:text-[1.5rem]"} border`;
+  const buttonHeightClass = isMobileLandscape
+    ? "h-[56px]"
+    : isDesktopLayout
+      ? "h-[54px]"
+      : "h-[45px]";
+  const base = `rounded flex cursor-pointer items-center justify-center font-black select-none transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${isMobileLandscape ? "text-[1.6875rem]" : isDesktopLayout ? "text-[1.45rem]" : "text-[1.5rem]"} ${buttonHeightClass}`;
+  const digit = `${base} ${isMobileLandscape ? "text-[1.875rem]" : isDesktopLayout ? "text-[1.6rem]" : "text-[1.7rem]"} border`;
   const op = `${base} border`;
   const pressedKeyStyle: React.CSSProperties = {
     background: "#67e8f9", color: "#020617", borderColor: "#67e8f9",
     boxShadow: "0 0 16px rgba(103,232,249,0.45)",
   };
-  const width = isMobileLandscape ? "w-[16.25rem]" : "w-[12.5rem] md:w-[13.75rem]";
+  const width = isMobileLandscape
+    ? "w-[16.25rem]"
+    : isDesktopLayout
+      ? "w-full min-w-0"
+      : "w-[12.5rem]";
   const keypadPanelStyle: CSSProperties = {
     background: toOpaqueColor(theme?.panelBackground) ?? "rgb(2,6,23)",
     border: `4px solid ${theme?.panelBorder ?? "rgba(56,189,248,0.45)"}`,
@@ -185,7 +194,9 @@ export default function NumericKeypad({
     >
       {/* Digital display — click toggles minimized */}
       <div
-        className="relative rounded-lg px-3.5 flex shrink-0 items-center justify-end overflow-visible h-14 md:h-12 cursor-pointer"
+        className={`relative rounded-lg px-3.5 flex shrink-0 items-center justify-end overflow-visible cursor-pointer ${
+          isDesktopLayout ? "h-14" : "h-14 md:h-12"
+        }`}
         onClick={onToggleMinimized}
         style={keypadDisplayStyle}
       >
@@ -218,9 +229,9 @@ export default function NumericKeypad({
                       : operatorKeyStyle
                 }
               >
-                {btn === "±" ? <span className={`${isMobileLandscape ? "text-[2.25rem]" : "text-[2.4rem] md:text-[2.1rem]"} leading-none`}>±</span>
-                  : btn === "⌫" ? <span className={`${isMobileLandscape ? "text-[2.475rem]" : "text-[2.8rem] md:text-[2.4rem]"} leading-none`}>⌫</span>
-                  : btn === "." ? <span className={`${isMobileLandscape ? "text-[2.475rem]" : "text-[2.8rem] md:text-[2.4rem]"} leading-none`}>.</span>
+                {btn === "±" ? <span className={`${isMobileLandscape ? "text-[2.25rem]" : isDesktopLayout ? "text-[2rem]" : "text-[2.4rem]"} leading-none`}>±</span>
+                  : btn === "⌫" ? <span className={`${isMobileLandscape ? "text-[2.475rem]" : isDesktopLayout ? "text-[2.2rem]" : "text-[2.8rem]"} leading-none`}>⌫</span>
+                  : btn === "." ? <span className={`${isMobileLandscape ? "text-[2.475rem]" : isDesktopLayout ? "text-[2.2rem]" : "text-[2.8rem]"} leading-none`}>.</span>
                   : btn}
               </button>
             ))}
@@ -238,9 +249,9 @@ export default function NumericKeypad({
           </button>
           <button type="button" onClick={onSubmit} disabled={!canSubmit}
             data-autopilot-key="submit"
-            className={`${base} flex-[2] arcade-button disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100`}>
+              className={`${base} flex-[2] arcade-button disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100`}>
             <svg viewBox="0 0 24 24" fill="none"
-              className={isMobileLandscape ? "w-[1.6875rem] h-[1.6875rem]" : "w-8 h-8 md:w-7 md:h-7"}
+              className={isMobileLandscape ? "w-[1.6875rem] h-[1.6875rem]" : isDesktopLayout ? "w-7 h-7" : "w-8 h-8"}
               strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 13 L9 18 L20 7" stroke="white" strokeWidth="3" />
             </svg>
