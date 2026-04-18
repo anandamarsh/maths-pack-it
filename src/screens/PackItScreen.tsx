@@ -90,7 +90,7 @@ const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
 const QUESTION_COUNT = 10;
 const AUTOPILOT_QUESTION_COUNT = 5;
-const QUESTION_KEYWORDS = new Set([
+const QUESTION_KEYWORDS = [
   "pack",
   "packed",
   "package",
@@ -111,7 +111,30 @@ const QUESTION_KEYWORDS = new Set([
   "each",
   "every",
   "per",
-]);
+  "बराबर",
+  "समान",
+  "हर",
+  "प्रति",
+  "बाँटा",
+  "विभाजित",
+  "平均",
+  "每个",
+  "相等",
+  "同样",
+  "分成",
+  "平均分",
+];
+
+const QUESTION_KEYWORD_PATTERN = QUESTION_KEYWORDS.slice()
+  .sort((left, right) => right.length - left.length)
+  .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  .join("|");
+
+const QUESTION_KEYWORD_REGEX = new RegExp(
+  QUESTION_KEYWORD_PATTERN,
+  "giu",
+);
+const QUESTION_KEYWORD_TEST_REGEX = new RegExp(QUESTION_KEYWORD_PATTERN, "iu");
 
 function buildInitialItems(question: PackQuestion): PackedItem[] {
   return Array.from({ length: question.totalA }, (_, index) => ({
@@ -185,8 +208,7 @@ function buildRobotTargetAssignments(
 }
 
 function isHighlightedToken(token: string): boolean {
-  const normalized = token.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return QUESTION_KEYWORDS.has(normalized);
+  return QUESTION_KEYWORD_TEST_REGEX.test(token);
 }
 
 function isNumericToken(token: string): boolean {
@@ -200,6 +222,13 @@ function isMathSymbolToken(token: string): boolean {
 function isMathWordToken(token: string): boolean {
   const normalized = token.replace(/[^a-z0-9]/gi, "").toLowerCase();
   return normalized === "per";
+}
+
+function splitQuestionText(text: string) {
+  const segments = text.match(
+    /\d+|∴|÷|=|[A-Za-z]+|[\u0900-\u097F]+|[\u4E00-\u9FFF]+|\s+|./gu,
+  );
+  return segments ?? [text];
 }
 
 const QUESTION_KEYWORD_COLOR = "#facc15";
@@ -323,25 +352,26 @@ function renderHighlightedQuestion(
 ): ReactNode {
   return text
     .trim()
-    .split(/\s+/)
-    .map((part, index, parts) => (
+    .replace(QUESTION_KEYWORD_REGEX, (match) => `\u0000${match}\u0000`)
+    .split("\u0000")
+    .flatMap((part) => splitQuestionText(part))
+    .map((part, index) => (
       <span key={`${part}-${index}`}>
         <span
           style={
             isMathSymbolToken(part) || isMathWordToken(part)
               ? { color: colors?.symbol ?? "#86efac" }
-              : isNumericToken(part)
-                ? { color: QUESTION_KEYWORD_COLOR }
-                : isHighlightedToken(part)
-                  ? { color: colors?.highlight ?? "#facc15" }
-                  : colors?.normal
-                    ? { color: colors.normal }
-                    : undefined
+                : isNumericToken(part)
+                  ? { color: QUESTION_KEYWORD_COLOR }
+                  : isHighlightedToken(part)
+                    ? { color: colors?.highlight ?? "#facc15" }
+                    : colors?.normal
+                      ? { color: colors.normal }
+                      : undefined
           }
         >
           {part}
         </span>
-        {index < parts.length - 1 ? " " : null}
       </span>
     ));
 }
