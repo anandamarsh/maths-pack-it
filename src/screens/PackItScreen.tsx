@@ -1864,7 +1864,7 @@ export default function PackItScreen() {
       desktopNextButtonTimerRef.current = window.setTimeout(() => {
         desktopNextButtonTimerRef.current = null;
         setShowNextQuestionButton(true);
-      }, 2000);
+      }, 1000);
       return;
     }
 
