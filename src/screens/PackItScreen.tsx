@@ -4836,10 +4836,19 @@ export default function PackItScreen() {
                       >
                         {showInsufficientItemNotice &&
                         remainingItems.length === 0 ? (
-                          <div className="pointer-events-none absolute inset-0 z-[4] flex items-center justify-center">
+                          <div
+                            className="pointer-events-none absolute inset-0 z-[4] flex items-center justify-center"
+                            style={{
+                              left: 0,
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                            }}
+                          >
                             <div
                               className="rounded-2xl px-5 py-3 text-center font-arcade text-[1.2rem] font-bold leading-tight text-white"
                               style={{
+                                maxWidth: "calc(100% - 2rem)",
                                 background:
                                   "linear-gradient(180deg, rgba(220,38,38,0.96), rgba(153,27,27,0.98))",
                                 border: "2px solid rgba(254,202,202,0.68)",

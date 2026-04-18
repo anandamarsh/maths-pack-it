@@ -5,6 +5,7 @@ import { playKeyClick } from "../sound";
 
 const DISPLAY_FONT_SIZE = "2.1rem";
 const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
+const KEYPAD_PANEL_BORDER_WIDTH_PX = 3;
 
 function toOpaqueColor(color: string | undefined) {
   if (!color) return color;
@@ -104,7 +105,7 @@ export default function NumericKeypad({
       : "w-[12.5rem]";
   const keypadPanelStyle: CSSProperties = {
     background: toOpaqueColor(theme?.panelBackground) ?? "rgb(2,6,23)",
-    border: `4px solid ${theme?.panelBorder ?? "rgba(56,189,248,0.45)"}`,
+    border: `${KEYPAD_PANEL_BORDER_WIDTH_PX}px solid ${theme?.panelBorder ?? "rgba(56,189,248,0.45)"}`,
     boxShadow:
       theme?.panelGlow ??
       "0 0 18px rgba(56,189,248,0.12), inset 0 0 12px rgba(0,0,0,0.4)",

@@ -921,7 +921,7 @@ export default function GameLayout({
             </div>
 
             {desktopRailTop ? (
-              <div className="mb-3 px-1 pt-2">
+              <div className="mb-3 px-1 pt-2" style={{ transform: "translateY(-2px)" }}>
                 {desktopRailTop}
               </div>
             ) : null}
@@ -935,7 +935,9 @@ export default function GameLayout({
             )}
 
             {renderedCalculator ? (
-              <div className="mt-auto">{renderedCalculator}</div>
+              <div className="mt-auto" style={{ transform: "translateY(2px)" }}>
+                {renderedCalculator}
+              </div>
             ) : null}
           </aside>
         )}
