@@ -201,6 +201,8 @@ const DESKTOP_DOCK_HEIGHT_PX = 15.25 * 16;
 const DESKTOP_TUBE_MIN_CAPACITY = 6;
 const DESKTOP_TUBE_MAX_CAPACITY = 11;
 const DESKTOP_TUBE_VERTICAL_RESERVE_PX = 100;
+const DESKTOP_GROUP_MIN_CAPACITY = 4;
+const DESKTOP_GROUP_MAX_CAPACITY = 8;
 const ROUND_LABELS: Record<RoundName, string> = {
   load: "Load",
   pack: "Pack",
@@ -221,6 +223,30 @@ function getDesktopTubeCapacityForSceneHeight(sceneHeight: number) {
   return Math.max(
     DESKTOP_TUBE_MIN_CAPACITY,
     Math.min(DESKTOP_TUBE_MAX_CAPACITY, estimatedCapacity),
+  );
+}
+
+function getDesktopGroupCapacityForSceneWidth(sceneWidth: number) {
+  const itemSizePx = 48;
+  const containerPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
+  const containerWidthPx = Math.max(
+    itemSizePx + containerPaddingX * 2,
+    Math.round(itemSizePx * 1.9),
+  );
+  const containerStripGapPx = Math.max(18, Math.round(itemSizePx * 0.8));
+  const containerColumnPaddingX = Math.max(10, Math.round(itemSizePx * 0.25));
+  const availableContainerWidth = Math.max(
+    0,
+    sceneWidth * 0.65 - containerColumnPaddingX * 2,
+  );
+  const estimatedCapacity = Math.floor(
+    (availableContainerWidth + containerStripGapPx) /
+      (containerWidthPx + containerStripGapPx),
+  );
+
+  return Math.max(
+    DESKTOP_GROUP_MIN_CAPACITY,
+    Math.min(DESKTOP_GROUP_MAX_CAPACITY, estimatedCapacity),
   );
 }
 
@@ -270,11 +296,12 @@ function DigitalCount({
 }) {
   return (
     <div
-      className="digital-meter rounded-[1.75rem] px-3 py-2 text-[1.6rem] leading-none"
+      className="digital-meter px-3 py-2 text-[1.6rem] leading-none"
       style={{
+        borderRadius: "8px",
         background: "rgba(15,23,42,0.7)",
         boxShadow:
-          "0 0 0 1px rgba(103,232,249,0.08), 0 0 18px rgba(103,232,249,0.12), 0 10px 22px rgba(2,6,23,0.52), inset 0 0 18px rgba(255,255,255,0.03)",
+          "0 0 10px rgba(103,232,249,0.12), 0 6px 16px rgba(2,6,23,0.34)",
         color,
         textShadow: `0 0 12px ${glow}, 0 0 22px ${glowOuter}`,
       }}
@@ -1368,6 +1395,11 @@ export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
   const isMobileLandscape = useIsMobileLandscape();
   const isMobile = useIsCoarsePointer();
+  const [desktopGroupCapacity, setDesktopGroupCapacity] = useState(() =>
+    typeof window === "undefined"
+      ? DESKTOP_GROUP_MAX_CAPACITY
+      : getDesktopGroupCapacityForSceneWidth(window.innerWidth),
+  );
   const [desktopTubeCapacity, setDesktopTubeCapacity] = useState(() =>
     typeof window === "undefined"
       ? DESKTOP_TUBE_MAX_CAPACITY
@@ -1379,9 +1411,10 @@ export default function PackItScreen() {
   const round = useMemo(
     () =>
       makeRound(1, roundName, isMobile, {
+        maxGroupCount: isMobile ? undefined : desktopGroupCapacity,
         maxUnitCount: isMobile ? undefined : desktopTubeCapacity,
       }),
-    [desktopTubeCapacity, isMobile, roundName],
+    [desktopGroupCapacity, desktopTubeCapacity, isMobile, roundName],
   );
   const [questionIndex, setQuestionIndex] = useState(0);
   const [items, setItems] = useState<PackedItem[]>(() =>
@@ -1479,6 +1512,12 @@ export default function PackItScreen() {
         window.innerHeight - DESKTOP_DOCK_HEIGHT_PX,
       );
       const nextCapacity = getDesktopTubeCapacityForSceneHeight(sceneHeight);
+      const nextGroupCapacity = getDesktopGroupCapacityForSceneWidth(
+        window.innerWidth,
+      );
+      setDesktopGroupCapacity((current) =>
+        current === nextGroupCapacity ? current : nextGroupCapacity,
+      );
       setDesktopTubeCapacity((current) =>
         current === nextCapacity ? current : nextCapacity,
       );
@@ -4718,33 +4757,37 @@ export default function PackItScreen() {
                                   <div
                                     aria-hidden="true"
                                     className="pointer-events-none absolute -left-[12px] -top-[10px]"
-                                  style={{
-                                    width: "12px",
-                                    height: "14px",
-                                    borderRight: `3px solid ${containerBorderColor}`,
-                                    borderTop: isMobile
-                                      ? "0"
-                                      : `3px solid ${containerBorderColor}`,
-                                    borderTopRightRadius: isMobile ? "0" : "14px",
-                                    boxShadow: `-4px -2px 8px -8px ${question.pair.palette}aa`,
-                                    opacity: 0.95,
-                                  }}
-                                />
+                                    style={{
+                                      width: "12px",
+                                      height: "14px",
+                                      borderRight: `3px solid ${containerBorderColor}`,
+                                      borderTop: isMobile
+                                        ? "0"
+                                        : `3px solid ${containerBorderColor}`,
+                                      borderTopRightRadius: isMobile
+                                        ? "0"
+                                        : "14px",
+                                      boxShadow: `-4px -2px 8px -8px ${question.pair.palette}aa`,
+                                      opacity: 0.95,
+                                    }}
+                                  />
                                   <div
                                     aria-hidden="true"
                                     className="pointer-events-none absolute -right-[12px] -top-[10px]"
-                                  style={{
-                                    width: "12px",
-                                    height: "14px",
-                                    borderLeft: `3px solid ${containerBorderColor}`,
-                                    borderTop: isMobile
-                                      ? "0"
-                                      : `3px solid ${containerBorderColor}`,
-                                    borderTopLeftRadius: isMobile ? "0" : "14px",
-                                    boxShadow: `4px -2px 8px -8px ${question.pair.palette}aa`,
-                                    opacity: 0.95,
-                                  }}
-                                />
+                                    style={{
+                                      width: "12px",
+                                      height: "14px",
+                                      borderLeft: `3px solid ${containerBorderColor}`,
+                                      borderTop: isMobile
+                                        ? "0"
+                                        : `3px solid ${containerBorderColor}`,
+                                      borderTopLeftRadius: isMobile
+                                        ? "0"
+                                        : "14px",
+                                      boxShadow: `4px -2px 8px -8px ${question.pair.palette}aa`,
+                                      opacity: 0.95,
+                                    }}
+                                  />
                                   <div
                                     aria-hidden="true"
                                     className="pointer-events-none absolute inset-y-3 left-[10%] w-[18%] rounded-full"

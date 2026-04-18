@@ -29,6 +29,7 @@ function getLevelOneRoundProfile(
   const baseProfile = isMobile ? MOBILE_ROUND_PROFILE : DESKTOP_ROUND_PROFILE;
   return {
     ...baseProfile,
+    maxGroupCount: overrides?.maxGroupCount ?? baseProfile.maxGroupCount,
     maxUnitCount: overrides?.maxUnitCount ?? baseProfile.maxUnitCount,
   };
 }

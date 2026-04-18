@@ -51,4 +51,5 @@ export interface RoundGenerationProfile {
 
 export interface RoundGenerationOverrides {
   maxUnitCount?: number;
+  maxGroupCount?: number;
 }
