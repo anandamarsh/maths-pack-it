@@ -33,20 +33,8 @@
     }
   ],
   "screenshots": [
-    {
-      "src": "/screenshots/pack-it-screenshot-1.jpg",
-      "sizes": "3040x1938",
-      "type": "image/jpeg",
-      "label": "Pack It gameplay on the loading round",
-      "form_factor": "wide"
-    },
-    {
-      "src": "/screenshots/pack-it-screenshot-2.jpg",
-      "sizes": "3040x1938",
-      "type": "image/jpeg",
-      "label": "Pack It gameplay on a later round",
-      "form_factor": "wide"
-    }
+    "/screenshots/pack-it-screenshot-1.jpg",
+    "/screenshots/pack-it-screenshot-2.jpg"
   ],
   "tags": ["unitary method", "ratios", "grouping", "packing"],
   "subjects": ["mathematics"],
