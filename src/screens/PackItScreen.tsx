@@ -1604,7 +1604,7 @@ export default function PackItScreen() {
   );
   const remainingItems = items.filter((item) => item.containerIndex === null);
   const packedItemsTotal = items.length - remainingItems.length;
-  const canSubmit = true;
+  const canSubmit = !showNextQuestionButton;
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const solvedQuestionCount = questionIndex + (questionSolved ? 1 : 0);
   const attemptedMistakeCount = mistakeQuestionIndexes.filter(
