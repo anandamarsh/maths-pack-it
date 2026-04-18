@@ -204,6 +204,7 @@ const PACK_HOLD_INTERVAL_MS = 150;
 const SHIP_RESULT_DELAY_MS = 500;
 const DESKTOP_TUBE_MIN_CAPACITY = 6;
 const DESKTOP_TUBE_MAX_CAPACITY = 10;
+const MOBILE_VISIBLE_TUBE_CAPACITY = 5;
 const DESKTOP_RIGHT_RAIL_WIDTH_PX = 17 * 16;
 const DESKTOP_GROUP_MIN_CAPACITY = 4;
 const DESKTOP_GROUP_MAX_CAPACITY = 8;
@@ -1675,7 +1676,7 @@ export default function PackItScreen() {
   const containerStackGapPx = 8;
   const containerStackStepPx = itemSizePx + containerStackGapPx;
   const visibleTubeCapacity = isMobileLandscape
-    ? question.unitRate
+    ? Math.min(question.unitRate, MOBILE_VISIBLE_TUBE_CAPACITY)
     : desktopTubeCapacity;
   const containerInnerMinHeightPx =
     itemSizePx + Math.max(0, visibleTubeCapacity - 1) * containerStackStepPx;
@@ -1687,7 +1688,7 @@ export default function PackItScreen() {
     Math.round(itemSizePx * 1.9),
   );
   const containerStripGapPx = Math.max(18, Math.round(itemSizePx * 0.8));
-  const containerStripBottomOffsetPx = isMobileLandscape ? 10 : 0;
+  const containerStripBottomOffsetPx = isMobileLandscape ? 14 : 0;
   const containerSnapZonePaddingPx = Math.max(
     18,
     Math.round(itemSizePx * 0.55),
@@ -1737,6 +1738,7 @@ export default function PackItScreen() {
   useEffect(() => {
     if (
       remainingItems.length === 0 &&
+      !showInsufficientItemNotice &&
       !questionSolved &&
       !showNextQuestionButton &&
       !isQuestionDemo
@@ -1759,6 +1761,7 @@ export default function PackItScreen() {
     isQuestionDemo,
     questionSolved,
     remainingItems.length,
+    showInsufficientItemNotice,
     showNextQuestionButton,
   ]);
 
@@ -3003,7 +3006,10 @@ export default function PackItScreen() {
         firstContainerRect.width / 2 -
         itemSizePx / 2 +
         containerSnapOffsetXPx,
-      y: firstContainerRect.top - itemSizePx - 16,
+      y:
+        firstContainerRect.top -
+        itemSizePx -
+        (isMobileLandscape ? 16 : 32),
     };
   }
 
@@ -4437,16 +4443,20 @@ export default function PackItScreen() {
     const showBoxCornerCta = showNextQuestionButton && !isDesktopLayout;
     const isDesktopExpanded = !isMobile && !calculatorMinimized;
     const questionPanelHeight = calculatorMinimized
-      ? "calc(4.5rem - 4px)"
+      ? isMobileLandscape
+        ? "calc(4.5rem + 2px)"
+        : "calc(4.5rem - 4px)"
       : isMobileLandscape
-        ? "calc(100% - 2px)"
+        ? "calc(100% + 4px)"
         : isDesktopExpanded
           ? "calc(100% - 0.4rem)"
           : undefined;
     const questionPanelMinHeight = calculatorMinimized
-      ? "calc(4.5rem - 4px)"
+      ? isMobileLandscape
+        ? "calc(4.5rem + 2px)"
+        : "calc(4.5rem - 4px)"
       : isMobileLandscape
-        ? "calc(100% - 2px)"
+        ? "calc(100% + 4px)"
         : isDesktopExpanded
           ? "calc(100% - 0.4rem)"
           : "10.5rem";
@@ -4458,6 +4468,10 @@ export default function PackItScreen() {
           height: questionPanelHeight,
           minHeight: questionPanelMinHeight,
           marginTop: isDesktopExpanded ? "0.4rem" : undefined,
+          transform:
+            isMobileLandscape && calculatorMinimized
+              ? "translateY(2px)"
+              : undefined,
           transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
         }}
       >
