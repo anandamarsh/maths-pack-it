@@ -23,6 +23,7 @@ export interface PackQuestion {
   level: Level;
   round: RoundName;
   subtype: QuestionSubtype;
+  questionTemplateIndex: number;
   pair: GroupingPair;
   totalA: number;
   groupsA: number;

@@ -6,11 +6,17 @@ import PhantomHand from "../components/PhantomHand";
 import GameLayout from "../components/GameLayout";
 import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
+import {
+  getLocalizedInsufficientItemsLabel,
+  getLocalizedLevelOneBlackboardSteps,
+  getLocalizedLevelOneQuestionText,
+} from "../calculations/level-1/round-1.ts";
 import { getDemoConfig } from "../demoMode";
 import {
   useIsCoarsePointer,
   useIsMobileLandscape,
 } from "../hooks/useMediaQuery";
+import { useLocale } from "../i18n";
 import {
   ensureAudioReady,
   isMuted,
@@ -1455,6 +1461,7 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
 
 export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
+  const { locale } = useLocale();
   const isMobileLandscape = useIsMobileLandscape();
   const isMobile = useIsCoarsePointer();
   const [desktopGroupCapacity, setDesktopGroupCapacity] = useState(() =>
@@ -1605,6 +1612,18 @@ export default function PackItScreen() {
   const remainingItems = items.filter((item) => item.containerIndex === null);
   const packedItemsTotal = items.length - remainingItems.length;
   const canSubmit = !showNextQuestionButton;
+  const localizedQuestionText = useMemo(
+    () => getLocalizedLevelOneQuestionText(question, locale),
+    [locale, question],
+  );
+  const localizedBlackboardSteps = useMemo(
+    () => getLocalizedLevelOneBlackboardSteps(question, locale),
+    [locale, question],
+  );
+  const localizedInsufficientItemsText = useMemo(
+    () => getLocalizedInsufficientItemsLabel(question.pair, locale),
+    [locale, question.pair],
+  );
   const score = round.questions.length - mistakeQuestionIndexes.length;
   const solvedQuestionCount = questionIndex + (questionSolved ? 1 : 0);
   const attemptedMistakeCount = mistakeQuestionIndexes.filter(
@@ -1804,7 +1823,7 @@ export default function PackItScreen() {
       return;
     }
 
-    const steps = question.blackboardSteps;
+    const steps = localizedBlackboardSteps;
     if (isDesktopLayout) {
       setTypedStepLengths([]);
       setDesktopRevealLineCount(0);
@@ -1842,7 +1861,7 @@ export default function PackItScreen() {
     };
   }, [
     isDesktopLayout,
-    question.blackboardSteps,
+    localizedBlackboardSteps,
     questionResetKey,
     showUnitReveal,
   ]);
@@ -1852,7 +1871,7 @@ export default function PackItScreen() {
       return;
     }
 
-    const totalLines = question.blackboardSteps.length;
+    const totalLines = localizedBlackboardSteps.length;
     if (desktopRevealLineCount <= 0) {
       return;
     }
@@ -1893,7 +1912,7 @@ export default function PackItScreen() {
   }, [
     desktopRevealLineCount,
     isDesktopLayout,
-    question.blackboardSteps,
+    localizedBlackboardSteps,
     showNextQuestionButton,
     showUnitReveal,
   ]);
@@ -1992,7 +2011,7 @@ export default function PackItScreen() {
     }
 
     setTypedQuestionLength(0);
-    const fullText = question.questionText;
+    const fullText = localizedQuestionText;
     let nextLength = 0;
     questionTypeIntervalRef.current = window.setInterval(() => {
       nextLength += 1;
@@ -2015,7 +2034,7 @@ export default function PackItScreen() {
         questionTypeIntervalRef.current = null;
       }
     };
-  }, [isRoundComplete, question.questionText, questionResetKey]);
+  }, [isRoundComplete, localizedQuestionText, questionResetKey]);
 
   useEffect(() => {
     if (!flash) {
@@ -4357,14 +4376,14 @@ export default function PackItScreen() {
 
   const visibleStepLines = showUnitReveal
     ? isDesktopLayout
-      ? question.blackboardSteps
+      ? localizedBlackboardSteps
           .slice(0, desktopRevealLineCount)
           .map(stripTrailingPeriod)
-      : question.blackboardSteps
+      : localizedBlackboardSteps
           .map((line, index) => line.slice(0, typedStepLengths[index] ?? 0))
           .filter((line) => line.length > 0)
     : [];
-  const visibleQuestionText = question.questionText.slice(
+  const visibleQuestionText = localizedQuestionText.slice(
     0,
     typedQuestionLength,
   );
@@ -4858,7 +4877,7 @@ export default function PackItScreen() {
                                   "0 1px 0 rgba(127,29,29,0.65), 0 0 8px rgba(255,255,255,0.18)",
                               }}
                             >
-                              {`Insufficient ${question.pair.itemPlural}`}
+                              {localizedInsufficientItemsText}
                             </div>
                           </div>
                         ) : null}
@@ -4942,7 +4961,7 @@ export default function PackItScreen() {
                                 className="ml-[7%] mr-[7%] flex max-w-[86%] flex-col items-start text-left"
                                 style={{ gap: "0.35rem" }}
                               >
-                                {question.blackboardSteps.map((line, index) => (
+                                {localizedBlackboardSteps.map((line, index) => (
                                   <div
                                     key={`desktop-answer-${index}`}
                                     className="w-full"
