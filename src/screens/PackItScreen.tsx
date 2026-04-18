@@ -229,6 +229,43 @@ function ProgressApple({ active }: { active: boolean }) {
   );
 }
 
+function MobileLevelButton({
+  label,
+  active,
+  locked,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  locked: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={locked}
+      className="h-8 w-10 rounded-lg border-2 text-sm font-black transition-colors disabled:cursor-not-allowed"
+      style={{
+        background: locked
+          ? "#0f172a"
+          : active
+            ? "#0ea5e9"
+            : "#1e293b",
+        borderColor: locked
+          ? "#1e293b"
+          : active
+            ? "#38bdf8"
+            : "#475569",
+        color: locked ? "#64748b" : "#ffffff",
+        opacity: locked ? 0.7 : 1,
+      }}
+    >
+      {locked ? "\u{1F512}" : label}
+    </button>
+  );
+}
+
 function getDesktopTubeCapacityForSceneHeight(sceneHeight: number) {
   const itemSizePx = 48;
   const stackStepPx = itemSizePx + 8;
@@ -1590,6 +1627,7 @@ export default function PackItScreen() {
   const progressTotal = isContinuousAutopilot
     ? AUTOPILOT_QUESTION_COUNT
     : QUESTION_COUNT;
+  const currentRoundLevel = ROUND_SEQUENCE.indexOf(roundName) + 1;
   const showDevCaptureControls = import.meta.env.DEV;
   const showAnswerBanner =
     !isQuestionDemo &&
@@ -4413,28 +4451,42 @@ export default function PackItScreen() {
   };
 
   const desktopRailTop = isDesktopLayout ? (
-    <div
-      className="grid grid-cols-5 gap-x-2 gap-y-3 justify-items-center"
-      style={{ paddingTop: "3rem" }}
-    >
-      {Array.from({ length: progressTotal }, (_, index) => {
-        const filled = index < autopilotProgress;
-        return (
-          <button
-            key={index}
-            type="button"
-            onClick={() => handleDevProgressDotClick(index)}
-            disabled={!import.meta.env.DEV}
-            className="inline-flex h-7 w-7 items-center justify-center transition-all duration-300 disabled:cursor-default"
-            style={{
-              transform: filled ? "scale(1.05)" : "scale(1)",
-              cursor: import.meta.env.DEV ? "pointer" : "default",
-            }}
-          >
-            <ProgressApple active={filled} />
-          </button>
-        );
-      })}
+    <div className="flex flex-col gap-3" style={{ marginTop: "2rem" }}>
+      <div className="flex items-center justify-center gap-2">
+        {ROUND_SEQUENCE.map((candidateRound, index) => {
+          const levelNumber = index + 1;
+          const locked = levelNumber > currentRoundLevel;
+          return (
+            <MobileLevelButton
+              key={`desktop-${candidateRound}`}
+              label={String(levelNumber)}
+              active={candidateRound === roundName}
+              locked={locked}
+              onClick={() => handleRoundChange(candidateRound)}
+            />
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-5 gap-x-2 gap-y-3 justify-items-center">
+        {Array.from({ length: progressTotal }, (_, index) => {
+          const filled = index < autopilotProgress;
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => handleDevProgressDotClick(index)}
+              disabled={!import.meta.env.DEV}
+              className="inline-flex h-7 w-7 items-center justify-center transition-all duration-300 disabled:cursor-default"
+              style={{
+                transform: filled ? "scale(1.05)" : "scale(1)",
+                cursor: import.meta.env.DEV ? "pointer" : "default",
+              }}
+            >
+              <ProgressApple active={filled} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   ) : null;
 
@@ -4490,9 +4542,31 @@ export default function PackItScreen() {
               style={{ touchAction: "none" }}
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex justify-center pt-[4px]">
-              <div className="pointer-events-auto flex flex-col items-center gap-0">
+              <div className="pointer-events-auto flex flex-col items-center gap-2">
                   <div
-                    className="mt-[4px] flex items-center justify-center gap-1.5"
+                    className="flex items-center gap-2"
+                    style={{
+                      opacity: isDesktopLayout ? 0 : 1,
+                      pointerEvents: isDesktopLayout ? "none" : "auto",
+                      visibility: isDesktopLayout ? "hidden" : "visible",
+                    }}
+                  >
+                    {ROUND_SEQUENCE.map((candidateRound, index) => {
+                      const levelNumber = index + 1;
+                      const locked = levelNumber > currentRoundLevel;
+                      return (
+                        <MobileLevelButton
+                          key={candidateRound}
+                          label={String(levelNumber)}
+                          active={candidateRound === roundName}
+                          locked={locked}
+                          onClick={() => handleRoundChange(candidateRound)}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div
+                    className="flex items-center justify-center gap-1.5"
                     style={{
                       opacity: isDesktopLayout ? 0 : 1,
                       pointerEvents: isDesktopLayout ? "none" : "auto",

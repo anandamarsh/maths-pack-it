@@ -29,7 +29,7 @@ export default function LevelButtons({
             onClick={() => !locked && onSelect(lv)}
             disabled={locked}
             title={locked ? t("level.completePrev", { n: lv - 1 }) : undefined}
-            className="w-9 h-8 rounded text-xs font-black border-2 transition-colors"
+            className="h-7 w-9 rounded text-xs font-black border-2 transition-colors"
             style={{
               background: locked ? "#0f172a" : isActive ? "#0ea5e9" : isDone ? "#78350f" : "#1e293b",
               borderColor: locked ? "#1e293b" : isActive ? "#38bdf8" : isDone ? "#fbbf24" : "#475569",
