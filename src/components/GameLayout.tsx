@@ -54,6 +54,7 @@ interface GameLayoutProps {
   onKeypadSubmit?: () => void;
   onKeypadEnterPress?: () => boolean;
   canSubmit?: boolean;
+  minimizeOnSubmit?: boolean;
   demoBanner?: ReactNode;
   calculatorTopBanner?: ReactNode;
   chromeTheme?: {
@@ -131,6 +132,7 @@ export default function GameLayout({
   onKeypadSubmit,
   onKeypadEnterPress,
   canSubmit = false,
+  minimizeOnSubmit = true,
   demoBanner,
   calculatorTopBanner,
   chromeTheme,
@@ -254,7 +256,12 @@ export default function GameLayout({
       return;
     }
 
-    if (isCoarsePointer && !effectiveCalcMinimized && !forceKeypadExpanded) {
+    if (
+      minimizeOnSubmit &&
+      isCoarsePointer &&
+      !effectiveCalcMinimized &&
+      !forceKeypadExpanded
+    ) {
       setCalcMinimized(true);
       pendingSubmitTimerRef.current = window.setTimeout(() => {
         pendingSubmitTimerRef.current = null;

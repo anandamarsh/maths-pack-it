@@ -1542,6 +1542,7 @@ export default function PackItScreen() {
       <span className="text-[#fde047]">{question.answer}</span>
     </span>
   ) : null;
+  const shouldMinimizeOnSubmit = question.round === "ship";
 
   useEffect(() => {
     itemsRef.current = items;
@@ -4158,25 +4159,27 @@ export default function PackItScreen() {
     const messageTheme = chromeTheme.messagePanel;
     const showBoxCornerCta = showNextQuestionButton;
     const isDesktopExpanded = !isMobile && !calculatorMinimized;
+    const questionPanelHeight = calculatorMinimized
+      ? "calc(4.5rem - 4px)"
+      : isMobileLandscape
+        ? "calc(100% - 2px)"
+        : isDesktopExpanded
+          ? "calc(100% - 0.4rem)"
+          : undefined;
+    const questionPanelMinHeight = calculatorMinimized
+      ? "calc(4.5rem - 4px)"
+      : isMobileLandscape
+        ? "calc(100% - 2px)"
+        : isDesktopExpanded
+          ? "calc(100% - 0.4rem)"
+          : "10.5rem";
 
     return (
       <div
-        className="flex h-full gap-0"
+        className="flex h-full items-end gap-0"
         style={{
-          height: calculatorMinimized
-            ? "4.5rem"
-            : isMobileLandscape
-              ? "100%"
-              : isDesktopExpanded
-                ? "calc(100% - 0.4rem)"
-                : undefined,
-          minHeight: calculatorMinimized
-            ? "4.5rem"
-            : isMobileLandscape
-              ? "100%"
-              : isDesktopExpanded
-                ? "calc(100% - 0.4rem)"
-                : "10.5rem",
+          height: questionPanelHeight,
+          minHeight: questionPanelMinHeight,
           marginTop: isDesktopExpanded ? "0.4rem" : undefined,
           transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
         }}
@@ -4300,7 +4303,9 @@ export default function PackItScreen() {
         onKeypadChange={handleCalculatorChange}
         onKeypadKeyInput={handleCalculatorKeyInput}
         onCapture={showDevCaptureControls ? handleCapture : undefined}
-        onToggleSquareSnip={showDevCaptureControls ? toggleSquareSnip : undefined}
+        onToggleSquareSnip={
+          showDevCaptureControls ? toggleSquareSnip : undefined
+        }
         squareSnipActive={showDevCaptureControls && snipMode}
         onRecordDemo={showDevCaptureControls ? handleRecordDemo : undefined}
         isRecordingDemo={isRecordingDemo}
@@ -4311,6 +4316,7 @@ export default function PackItScreen() {
         onKeypadSubmit={handleSubmitAnswer}
         onKeypadEnterPress={handleKeypadEnterPress}
         canSubmit={canSubmit}
+        minimizeOnSubmit={shouldMinimizeOnSubmit}
         calculatorTopBanner={calculatorTopBanner}
         chromeTheme={chromeTheme}
         mobileMinimizeResetKey={`${roundName}-${questionIndex}`}
@@ -4627,138 +4633,150 @@ export default function PackItScreen() {
                           paddingBottom: `${containerStripBottomOffsetPx}px`,
                         }}
                       >
-                        {containers.map((containerItems, index) =>
-                          (() => {
-                            return (
-                              <div
-                                key={`${questionIndex}-${index}`}
-                                ref={(node) => {
-                                  containerRefs.current[index] = node;
-                                }}
-                                onPointerDown={(event) =>
-                                  isTapFillRound
-                                    ? handleContainerPointerDown(index, event)
-                                    : undefined
-                                }
-                                className="relative overflow-visible"
-                                style={{
-                                  borderLeft: `3px solid ${containerBorderColor}`,
-                                  borderRight: `3px solid ${containerBorderColor}`,
-                                  borderBottom: `3px solid ${containerBorderColor}`,
-                                  borderTop: "0",
-                                  borderTopLeftRadius: "0",
-                                  borderTopRightRadius: "0",
-                                  borderBottomLeftRadius: "2.4rem",
-                                  borderBottomRightRadius: "2.4rem",
-                                  background: `linear-gradient(180deg, rgba(255,255,255,0.14) 0%, ${question.pair.palette}22 22%, rgba(15,23,42,0.12) 58%, rgba(2,6,23,0.22) 100%)`,
-                                  boxShadow: containerBorderGlow,
-                                  opacity: 1,
-                                  width: `${containerWidthPx}px`,
-                                  minHeight: `${containerMinHeightPx}px`,
-                                  paddingLeft: `${containerPaddingX}px`,
-                                  paddingRight: `${containerPaddingX}px`,
-                                  paddingTop: `${containerPaddingY}px`,
-                                  paddingBottom: `${containerPaddingY}px`,
-                                  backdropFilter: "blur(2px)",
-                                }}
-                              >
+                        <div
+                          className="flex items-end justify-center"
+                          style={{
+                            gap: `${containerStripGapPx}px`,
+                            background: "transparent",
+                          }}
+                        >
+                          {containers.map((containerItems, index) =>
+                            (() => {
+                              return (
                                 <div
-                                  aria-hidden="true"
-                                  className="pointer-events-none absolute -left-[12px] -top-[10px]"
+                                  key={`${questionIndex}-${index}`}
+                                  ref={(node) => {
+                                    containerRefs.current[index] = node;
+                                  }}
+                                  onPointerDown={(event) =>
+                                    isTapFillRound
+                                      ? handleContainerPointerDown(index, event)
+                                      : undefined
+                                  }
+                                  className="relative overflow-visible"
+                                  style={{
+                                    borderLeft: `3px solid ${containerBorderColor}`,
+                                    borderRight: `3px solid ${containerBorderColor}`,
+                                    borderBottom: `3px solid ${containerBorderColor}`,
+                                    borderTop: "0",
+                                    borderTopLeftRadius: "0",
+                                    borderTopRightRadius: "0",
+                                    borderBottomLeftRadius: "2.4rem",
+                                    borderBottomRightRadius: "2.4rem",
+                                    background: "transparent",
+                                    boxShadow: containerBorderGlow,
+                                    opacity: 1,
+                                    width: `${containerWidthPx}px`,
+                                    minHeight: `${containerMinHeightPx}px`,
+                                    paddingLeft: `${containerPaddingX}px`,
+                                    paddingRight: `${containerPaddingX}px`,
+                                    paddingTop: `${containerPaddingY}px`,
+                                    paddingBottom: `${containerPaddingY}px`,
+                                    backdropFilter: "none",
+                                  }}
+                                >
+                                  <div
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute -left-[12px] -top-[10px]"
                                   style={{
                                     width: "12px",
                                     height: "14px",
                                     borderRight: `3px solid ${containerBorderColor}`,
-                                    borderTop: `3px solid ${containerBorderColor}`,
-                                    borderTopRightRadius: "14px",
+                                    borderTop: isMobile
+                                      ? "0"
+                                      : `3px solid ${containerBorderColor}`,
+                                    borderTopRightRadius: isMobile ? "0" : "14px",
                                     boxShadow: `-4px -2px 8px -8px ${question.pair.palette}aa`,
                                     opacity: 0.95,
                                   }}
                                 />
-                                <div
-                                  aria-hidden="true"
-                                  className="pointer-events-none absolute -right-[12px] -top-[10px]"
+                                  <div
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute -right-[12px] -top-[10px]"
                                   style={{
                                     width: "12px",
                                     height: "14px",
                                     borderLeft: `3px solid ${containerBorderColor}`,
-                                    borderTop: `3px solid ${containerBorderColor}`,
-                                    borderTopLeftRadius: "14px",
+                                    borderTop: isMobile
+                                      ? "0"
+                                      : `3px solid ${containerBorderColor}`,
+                                    borderTopLeftRadius: isMobile ? "0" : "14px",
                                     boxShadow: `4px -2px 8px -8px ${question.pair.palette}aa`,
                                     opacity: 0.95,
                                   }}
                                 />
-                                <div
-                                  aria-hidden="true"
-                                  className="pointer-events-none absolute inset-y-3 left-[10%] w-[18%] rounded-full"
-                                  style={{
-                                    background:
-                                      "linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.03))",
-                                    opacity: 0.8,
-                                  }}
-                                />
-                                <div
-                                  aria-hidden="true"
-                                  className="pointer-events-none absolute inset-x-3 bottom-3 rounded-b-[2rem]"
-                                  style={{
-                                    height: "18%",
-                                    background: `linear-gradient(180deg, ${question.pair.palette}18, ${question.pair.palette}30)`,
-                                    opacity: 0.7,
-                                  }}
-                                />
-                                <div
-                                  className="absolute inset-x-0 flex items-end justify-center"
-                                  style={{
-                                    width: "100%",
-                                    minHeight: `${containerInnerMinHeightPx}px`,
-                                    bottom: `${containerPaddingY + containerStackLiftPx}px`,
-                                  }}
-                                >
-                                  {containerItems.map((item, stackIndex) => (
-                                    <button
-                                      key={item.id}
-                                      ref={(node) => {
-                                        itemRefs.current[item.id] = node;
-                                      }}
-                                      type="button"
-                                      aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
-                                      onPointerDown={(event) =>
-                                        handlePointerDown(item.id, event)
-                                      }
-                                      className="absolute left-0 flex items-center justify-center bg-transparent leading-none"
-                                      style={{
-                                        ...itemBoxStyle,
-                                        left: `calc(50% - ${itemSizePx / 2}px)`,
-                                        bottom: `${stackIndex * containerStackStepPx}px`,
-                                        touchAction: "none",
-                                        zIndex: stackIndex + 1,
-                                        opacity:
-                                          (dragState?.isLifted &&
-                                            draggedItemIds.has(item.id)) ||
-                                          returningItemIds.has(item.id)
-                                            ? 0
-                                            : 1,
-                                        pointerEvents:
-                                          revealCtaMode === "retry" ||
-                                          isQuestionDemo ||
-                                          isTapFillRound
-                                            ? "none"
-                                            : "auto",
-                                      }}
-                                    >
-                                      <span
-                                        className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
-                                        style={{ transform: itemTranslateY }}
+                                  <div
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute inset-y-3 left-[10%] w-[18%] rounded-full"
+                                    style={{
+                                      background:
+                                        "linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.03))",
+                                      opacity: 0.8,
+                                    }}
+                                  />
+                                  <div
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute inset-x-3 bottom-3 rounded-b-[2rem]"
+                                    style={{
+                                      height: "18%",
+                                      background: `linear-gradient(180deg, ${question.pair.palette}18, ${question.pair.palette}30)`,
+                                      opacity: 0.7,
+                                    }}
+                                  />
+                                  <div
+                                    className="absolute inset-x-0 flex items-end justify-center"
+                                    style={{
+                                      width: "100%",
+                                      minHeight: `${containerInnerMinHeightPx}px`,
+                                      bottom: `${containerPaddingY + containerStackLiftPx}px`,
+                                    }}
+                                  >
+                                    {containerItems.map((item, stackIndex) => (
+                                      <button
+                                        key={item.id}
+                                        ref={(node) => {
+                                          itemRefs.current[item.id] = node;
+                                        }}
+                                        type="button"
+                                        aria-label={`Remove ${question.pair.item} from ${question.pair.container} ${index + 1}`}
+                                        onPointerDown={(event) =>
+                                          handlePointerDown(item.id, event)
+                                        }
+                                        className="absolute left-0 flex items-center justify-center bg-transparent leading-none"
+                                        style={{
+                                          ...itemBoxStyle,
+                                          left: `calc(50% - ${itemSizePx / 2}px)`,
+                                          bottom: `${stackIndex * containerStackStepPx}px`,
+                                          touchAction: "none",
+                                          zIndex: stackIndex + 1,
+                                          opacity:
+                                            (dragState?.isLifted &&
+                                              draggedItemIds.has(item.id)) ||
+                                            returningItemIds.has(item.id)
+                                              ? 0
+                                              : 1,
+                                          pointerEvents:
+                                            revealCtaMode === "retry" ||
+                                            isQuestionDemo ||
+                                            isTapFillRound
+                                              ? "none"
+                                              : "auto",
+                                        }}
                                       >
-                                        {question.pair.itemEmoji}
-                                      </span>
-                                    </button>
-                                  ))}
+                                        <span
+                                          className="relative z-[1] flex h-full w-full items-center justify-center leading-none text-center"
+                                          style={{ transform: itemTranslateY }}
+                                        >
+                                          {question.pair.itemEmoji}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })(),
-                        )}
+                              );
+                            })(),
+                          )}
+                        </div>
                       </div>
                     </div>
 
