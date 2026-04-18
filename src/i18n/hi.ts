@@ -47,6 +47,13 @@ const hi: Translations = {
   "game.entryPrompt": "आपने कितनी लहरें बनाईं?",
   "game.tryOnYourOwn": "खुद कोशिश करें",
   "game.tapAnywhere": "कहीं भी थपथपाएं!",
+  "game.next": "अगला",
+  "game.answerLabel": "उत्तर:",
+  "game.roundLoad": "लोड",
+  "game.roundPack": "पैक",
+  "game.roundShip": "शिप",
+  "game.complete": "पूरा",
+  "game.nextRound": "अगला",
 
   // Rotate
   "rotate.heading": "डिवाइस घुमाएं",
@@ -57,6 +64,11 @@ const hi: Translations = {
   "social.commentsTitle": "DiscussIt टिप्पणियाँ",
   "social.youtubePrompt": "पहली बार खेल रहे हैं? कैसे खेलें, यह वीडियो देखें।",
   "social.youtubeDismiss": "दोबारा न दिखाएं",
+  "social.watchHowToPlay": "कैसे खेलें देखें",
+  "social.howToPlayVideo": "कैसे खेलें वीडियो",
+  "social.closeHowToPlayVideo": "कैसे खेलें वीडियो बंद करें",
+  "social.howToPlayVideoPrompt": "कैसे खेलें वीडियो संकेत",
+  "dev.recordDemoVideo": "डेमो वीडियो रिकॉर्ड करें",
 
   // PDF
   "pdf.title": "Pack It!",

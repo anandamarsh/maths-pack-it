@@ -49,6 +49,13 @@ export type Translations = {
   "game.entryPrompt": string;
   "game.tryOnYourOwn": string;
   "game.tapAnywhere": string;
+  "game.next": string;
+  "game.answerLabel": string;
+  "game.roundLoad": string;
+  "game.roundPack": string;
+  "game.roundShip": string;
+  "game.complete": string;
+  "game.nextRound": string;
 
   // Rotate
   "rotate.heading": string;
@@ -59,6 +66,11 @@ export type Translations = {
   "social.commentsTitle": string;
   "social.youtubePrompt": string;
   "social.youtubeDismiss": string;
+  "social.watchHowToPlay": string;
+  "social.howToPlayVideo": string;
+  "social.closeHowToPlayVideo": string;
+  "social.howToPlayVideoPrompt": string;
+  "dev.recordDemoVideo": string;
 
   // PDF
   "pdf.title": string;

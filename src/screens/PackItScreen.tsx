@@ -16,7 +16,7 @@ import {
   useIsCoarsePointer,
   useIsMobileLandscape,
 } from "../hooks/useMediaQuery";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import {
   ensureAudioReady,
   isMuted,
@@ -214,11 +214,6 @@ const MOBILE_VISIBLE_TUBE_CAPACITY = 5;
 const DESKTOP_RIGHT_RAIL_WIDTH_PX = 17 * 16;
 const DESKTOP_GROUP_MIN_CAPACITY = 4;
 const DESKTOP_GROUP_MAX_CAPACITY = 8;
-const ROUND_LABELS: Record<RoundName, string> = {
-  load: "Load",
-  pack: "Pack",
-  ship: "Ship",
-};
 const ROUND_SEQUENCE: RoundName[] = ["load", "pack", "ship"];
 
 function ProgressApple({ active }: { active: boolean }) {
@@ -1462,6 +1457,7 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
 export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
   const { locale } = useLocale();
+  const t = useT();
   const isMobileLandscape = useIsMobileLandscape();
   const isMobile = useIsCoarsePointer();
   const [desktopGroupCapacity, setDesktopGroupCapacity] = useState(() =>
@@ -1727,7 +1723,7 @@ export default function PackItScreen() {
   const itemHalfPx = itemSizePx / 2;
   const calculatorTopBanner = showAnswerBanner ? (
     <span className="font-black tracking-[0.06em]">
-      <span className="text-white">Answer:</span>{" "}
+      <span className="text-white">{t("game.answerLabel")}</span>{" "}
       <span className="text-[#fde047]">{question.answer}</span>
     </span>
   ) : null;
@@ -4389,6 +4385,11 @@ export default function PackItScreen() {
   );
   const nextRoundName =
     ROUND_SEQUENCE[ROUND_SEQUENCE.indexOf(roundName) + 1] ?? null;
+  const roundLabels: Record<RoundName, string> = {
+    load: t("game.roundLoad"),
+    pack: t("game.roundPack"),
+    ship: t("game.roundShip"),
+  };
 
   function handleRoundCompleteContinue() {
     if (nextRoundName) {
@@ -4591,7 +4592,7 @@ export default function PackItScreen() {
                   : "h-[38px] px-4 text-[0.82rem]"
               }`}
             >
-              {revealCtaMode === "retry" ? "Now you try it" : "Next"}
+              {revealCtaMode === "retry" ? t("game.tryOnYourOwn") : t("game.next")}
             </button>
           ) : null}
         </div>
@@ -4831,7 +4832,7 @@ export default function PackItScreen() {
                             animateItemsBackToSource();
                           }}
                         >
-                          Now you try it
+                          {t("game.tryOnYourOwn")}
                         </button>
                       </div>
                     ) : null}
@@ -5028,8 +5029,8 @@ export default function PackItScreen() {
                                     className="arcade-button inline-flex h-[42px] items-center rounded-full px-5 font-arcade text-[0.86rem] font-bold leading-none text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 active:scale-[0.98]"
                                   >
                                     {revealCtaMode === "retry"
-                                      ? "Now you try it"
-                                      : "Next"}
+                                      ? t("game.tryOnYourOwn")
+                                      : t("game.next")}
                                   </button>
                                 </div>
                               ) : (
@@ -5530,7 +5531,7 @@ export default function PackItScreen() {
             }}
           >
             <div className="text-4xl font-black uppercase tracking-[0.18em] text-yellow-300 md:text-5xl">
-              {ROUND_LABELS[roundName]} Complete
+              {roundLabels[roundName]} {t("game.complete")}
             </div>
             <div className="mt-3 text-base font-bold text-cyan-200 md:text-lg">
               Score: {roundCompletionScore}/{roundCompletionTotal}
@@ -5563,7 +5564,7 @@ export default function PackItScreen() {
                 className="arcade-button inline-flex h-12 items-center rounded-full px-6 font-arcade text-base font-bold uppercase tracking-[0.08em] text-white"
               >
                 {nextRoundName
-                  ? `Next: ${ROUND_LABELS[nextRoundName]}`
+                  ? `${t("game.nextRound")}: ${roundLabels[nextRoundName]}`
                   : "Play Again"}
               </button>
             </div>

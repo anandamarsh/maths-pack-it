@@ -47,6 +47,13 @@ const ru: Translations = {
   "game.entryPrompt": "Сколько кругов вы создали?",
   "game.tryOnYourOwn": "Попробуйте сами",
   "game.tapAnywhere": "Нажмите куда-нибудь!",
+  "game.next": "Далее",
+  "game.answerLabel": "Ответ:",
+  "game.roundLoad": "Загрузка",
+  "game.roundPack": "Упаковка",
+  "game.roundShip": "Отправка",
+  "game.complete": "завершён",
+  "game.nextRound": "Следующий",
 
   // Rotate
   "rotate.heading": "Поверните устройство",
@@ -57,6 +64,11 @@ const ru: Translations = {
   "social.commentsTitle": "Комментарии DiscussIt",
   "social.youtubePrompt": "В первый раз? Посмотрите видео о том, как играть.",
   "social.youtubeDismiss": "Больше не показывать",
+  "social.watchHowToPlay": "Смотреть как играть",
+  "social.howToPlayVideo": "Видео как играть",
+  "social.closeHowToPlayVideo": "Закрыть видео как играть",
+  "social.howToPlayVideoPrompt": "Подсказка видео как играть",
+  "dev.recordDemoVideo": "Записать демо-видео",
 
   // PDF
   "pdf.title": "Pack It!",

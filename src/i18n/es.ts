@@ -47,6 +47,13 @@ const es: Translations = {
   "game.entryPrompt": "¿Cuántas ondas hiciste?",
   "game.tryOnYourOwn": "Inténtalo tú mismo",
   "game.tapAnywhere": "¡Toca en cualquier lugar!",
+  "game.next": "Siguiente",
+  "game.answerLabel": "Respuesta:",
+  "game.roundLoad": "Cargar",
+  "game.roundPack": "Empacar",
+  "game.roundShip": "Enviar",
+  "game.complete": "Completado",
+  "game.nextRound": "Siguiente",
 
   // Rotate
   "rotate.heading": "Gira tu dispositivo",
@@ -57,6 +64,11 @@ const es: Translations = {
   "social.commentsTitle": "Comentarios de DiscussIt",
   "social.youtubePrompt": "¿Es tu primera vez? Mira un video sobre cómo jugar.",
   "social.youtubeDismiss": "No volver a mostrar",
+  "social.watchHowToPlay": "Ver cómo jugar",
+  "social.howToPlayVideo": "Video de cómo jugar",
+  "social.closeHowToPlayVideo": "Cerrar video de cómo jugar",
+  "social.howToPlayVideoPrompt": "Aviso del video de cómo jugar",
+  "dev.recordDemoVideo": "Grabar video de demostración",
 
   // PDF
   "pdf.title": "Pack It!",

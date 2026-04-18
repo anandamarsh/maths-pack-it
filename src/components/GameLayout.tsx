@@ -444,12 +444,12 @@ export default function GameLayout({
             className="social-video-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="How to play video"
+            aria-label={t("social.howToPlayVideo")}
           >
             <button
               type="button"
               className="social-video-modal-close"
-              aria-label="Close how to play video"
+              aria-label={t("social.closeHowToPlayVideo")}
               onClick={() => setYoutubeModalOpen(false)}
             >
               <CloseIcon
@@ -459,7 +459,7 @@ export default function GameLayout({
             </button>
             <iframe
               src={youtubeEmbedUrl}
-              title="How to play video"
+              title={t("social.howToPlayVideo")}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
@@ -566,7 +566,7 @@ export default function GameLayout({
           {onRecordDemo && !isRecordingDemo && (
             <button
               onClick={onRecordDemo}
-              title="Record demo video"
+              title={t("dev.recordDemoVideo")}
               className="arcade-button w-10 h-10 flex items-center justify-center p-2"
             >
               <svg
@@ -702,7 +702,7 @@ export default function GameLayout({
                 <div
                   className="social-video-bubble"
                   role="complementary"
-                  aria-label="How to play video prompt"
+                  aria-label={t("social.howToPlayVideoPrompt")}
                 >
                   <button
                     type="button"
@@ -732,8 +732,8 @@ export default function GameLayout({
 
               <button
                 type="button"
-                title="Watch how to play"
-                aria-label="Watch how to play"
+                title={t("social.watchHowToPlay")}
+                aria-label={t("social.watchHowToPlay")}
                 className={`social-video-button ${youtubeModalOpen ? "is-active" : ""}`}
                 onClick={() => setYoutubeModalOpen(true)}
               >
@@ -905,8 +905,8 @@ export default function GameLayout({
                 {youtubeEmbedUrl && (
                   <button
                     type="button"
-                    title="Watch how to play"
-                    aria-label="Watch how to play"
+                    title={t("social.watchHowToPlay")}
+                    aria-label={t("social.watchHowToPlay")}
                     className={`social-video-button ${youtubeModalOpen ? "is-active" : ""}`}
                     onClick={() => setYoutubeModalOpen(true)}
                   >

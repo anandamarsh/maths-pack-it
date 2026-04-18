@@ -47,6 +47,13 @@ const zh: Translations = {
   "game.entryPrompt": "你制造了多少个涟漪？",
   "game.tryOnYourOwn": "自己试一试",
   "game.tapAnywhere": "点击任意位置！",
+  "game.next": "下一题",
+  "game.answerLabel": "答案：",
+  "game.roundLoad": "装入",
+  "game.roundPack": "打包",
+  "game.roundShip": "运送",
+  "game.complete": "完成",
+  "game.nextRound": "下一项",
 
   // Rotate
   "rotate.heading": "请旋转设备",
@@ -57,6 +64,11 @@ const zh: Translations = {
   "social.commentsTitle": "DiscussIt 评论",
   "social.youtubePrompt": "第一次玩吗？先看一个如何玩的影片。",
   "social.youtubeDismiss": "不再显示",
+  "social.watchHowToPlay": "观看玩法",
+  "social.howToPlayVideo": "玩法视频",
+  "social.closeHowToPlayVideo": "关闭玩法视频",
+  "social.howToPlayVideoPrompt": "玩法视频提示",
+  "dev.recordDemoVideo": "录制演示视频",
 
   // PDF
   "pdf.title": "Pack It!",

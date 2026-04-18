@@ -47,6 +47,13 @@ const en: Translations = {
   "game.entryPrompt": "How many ripples did you make?",
   "game.tryOnYourOwn": "Try on your own",
   "game.tapAnywhere": "Tap anywhere!",
+  "game.next": "Next",
+  "game.answerLabel": "Answer:",
+  "game.roundLoad": "Load",
+  "game.roundPack": "Pack",
+  "game.roundShip": "Ship",
+  "game.complete": "Complete",
+  "game.nextRound": "Next",
 
   // Rotate prompt
   "rotate.heading": "Rotate your device",
@@ -57,6 +64,11 @@ const en: Translations = {
   "social.commentsTitle": "DiscussIt comments",
   "social.youtubePrompt": "First time? Look at a video on how to play.",
   "social.youtubeDismiss": "Don't show again",
+  "social.watchHowToPlay": "Watch how to play",
+  "social.howToPlayVideo": "How to play video",
+  "social.closeHowToPlayVideo": "Close how to play video",
+  "social.howToPlayVideoPrompt": "How to play video prompt",
+  "dev.recordDemoVideo": "Record demo video",
 
   // PDF report
   "pdf.title": "Pack It!",
