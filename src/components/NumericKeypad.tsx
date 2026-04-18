@@ -190,7 +190,7 @@ export default function NumericKeypad({
 
   return (
     <div
-      className={`relative flex min-h-0 min-w-0 ${width} shrink-0 flex-col rounded-xl p-1.5 gap-1`}
+      className={`relative flex h-full min-h-0 min-w-0 ${width} shrink-0 self-stretch flex-col rounded-xl p-1.5 gap-1`}
       style={keypadPanelStyle}
     >
       {/* Digital display — click toggles minimized */}
