@@ -5149,12 +5149,8 @@ export default function PackItScreen() {
                                       width: "12px",
                                       height: "14px",
                                       borderRight: `3px solid ${containerBorderColor}`,
-                                      borderTop: isMobile
-                                        ? "0"
-                                        : `3px solid ${containerBorderColor}`,
-                                      borderTopRightRadius: isMobile
-                                        ? "0"
-                                        : "14px",
+                                      borderTop: "0",
+                                      borderTopRightRadius: "0",
                                       boxShadow: `-4px -2px 8px -8px ${question.pair.palette}aa`,
                                       opacity: 0.95,
                                     }}
@@ -5166,12 +5162,8 @@ export default function PackItScreen() {
                                       width: "12px",
                                       height: "14px",
                                       borderLeft: `3px solid ${containerBorderColor}`,
-                                      borderTop: isMobile
-                                        ? "0"
-                                        : `3px solid ${containerBorderColor}`,
-                                      borderTopLeftRadius: isMobile
-                                        ? "0"
-                                        : "14px",
+                                      borderTop: "0",
+                                      borderTopLeftRadius: "0",
                                       boxShadow: `4px -2px 8px -8px ${question.pair.palette}aa`,
                                       opacity: 0.95,
                                     }}
