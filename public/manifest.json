@@ -34,16 +34,16 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshots/pack-it-screenshot 1.png",
+      "src": "/screenshots/pack-it-screenshot-1.jpg",
       "sizes": "3040x1938",
-      "type": "image/png",
+      "type": "image/jpeg",
       "label": "Pack It gameplay on the loading round",
       "form_factor": "wide"
     },
     {
-      "src": "/screenshots/pack-it-screenshot 2.png",
+      "src": "/screenshots/pack-it-screenshot-2.jpg",
       "sizes": "3040x1938",
-      "type": "image/png",
+      "type": "image/jpeg",
       "label": "Pack It gameplay on a later round",
       "form_factor": "wide"
     }
