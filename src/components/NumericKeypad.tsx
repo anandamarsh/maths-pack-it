@@ -94,7 +94,7 @@ export default function NumericKeypad({
   const base = `rounded flex cursor-pointer items-center justify-center font-black select-none transition-all duration-150 hover:scale-[1.03] hover:brightness-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 ${isMobileLandscape ? "text-[1.6875rem]" : isDesktopLayout ? "text-[1.45rem]" : "text-[1.5rem]"} ${buttonHeightClass}`;
   const digit = `${base} ${isMobileLandscape ? "text-[1.875rem]" : isDesktopLayout ? "text-[1.6rem]" : "text-[1.7rem]"} border`;
   const op = `${base} border`;
-  const mobileBottomButtonHeightClass = isMobileLandscape ? "h-[52px]" : "";
+  const mobileBottomButtonHeightClass = isMobileLandscape ? "h-[48px]" : "";
   const pressedKeyStyle: React.CSSProperties = {
     background: "#67e8f9", color: "#020617", borderColor: "#67e8f9",
     boxShadow: "0 0 16px rgba(103,232,249,0.45)",
