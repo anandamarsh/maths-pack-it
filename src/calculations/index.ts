@@ -3,26 +3,28 @@ import {
   createLevelOnePackRound,
   createLevelOneShipRound,
 } from "./level-1/index.ts";
-import type { Level, RoundConfig, RoundName } from "./types.ts";
+import type {
+  Level,
+  RoundConfig,
+  RoundGenerationOverrides,
+  RoundName,
+} from "./types.ts";
 
 export function createRound(
   level: Level,
   round: RoundName,
-  isMobileOrRandom: boolean | (() => number) = false,
+  isMobile = false,
   random: () => number = Math.random,
+  overrides?: RoundGenerationOverrides,
 ): RoundConfig {
-  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
-  const resolvedRandom =
-    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
-
   if (level === 1 && round === "load") {
-    return createLevelOneLoadRound(isMobile, resolvedRandom);
+    return createLevelOneLoadRound(isMobile, random, overrides);
   }
   if (level === 1 && round === "pack") {
-    return createLevelOnePackRound(isMobile, resolvedRandom);
+    return createLevelOnePackRound(isMobile, random, overrides);
   }
   if (level === 1 && round === "ship") {
-    return createLevelOneShipRound(isMobile, resolvedRandom);
+    return createLevelOneShipRound(isMobile, random, overrides);
   }
 
   throw new Error(`Round not implemented yet: level ${level} / ${round}`);
@@ -33,6 +35,7 @@ export type {
   Level,
   PackQuestion,
   RoundConfig,
+  RoundGenerationOverrides,
   RoundGenerationProfile,
   RoundName,
 } from "./types.ts";

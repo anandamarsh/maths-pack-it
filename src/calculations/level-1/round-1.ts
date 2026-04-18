@@ -3,6 +3,7 @@ import type {
   GroupingPair,
   PackQuestion,
   RoundConfig,
+  RoundGenerationOverrides,
   RoundGenerationProfile,
   RoundName,
 } from "../types.ts";
@@ -18,11 +19,18 @@ const DESKTOP_ROUND_PROFILE: RoundGenerationProfile = {
   minTotalCount: 20,
   maxTotalCount: 80,
   maxGroupCount: 8,
-  maxUnitCount: 6,
+  maxUnitCount: 10,
 };
 
-function getLevelOneRoundProfile(isMobile: boolean): RoundGenerationProfile {
-  return isMobile ? MOBILE_ROUND_PROFILE : DESKTOP_ROUND_PROFILE;
+function getLevelOneRoundProfile(
+  isMobile: boolean,
+  overrides?: RoundGenerationOverrides,
+): RoundGenerationProfile {
+  const baseProfile = isMobile ? MOBILE_ROUND_PROFILE : DESKTOP_ROUND_PROFILE;
+  return {
+    ...baseProfile,
+    maxUnitCount: overrides?.maxUnitCount ?? baseProfile.maxUnitCount,
+  };
 }
 
 function capitalize(text: string) {
@@ -345,31 +353,37 @@ export function createLevelOneShipQuestion(
 }
 
 export function createLevelOneLoadRound(
-  isMobileOrRandom: boolean | (() => number) = false,
+  isMobile = false,
   random: () => number = Math.random,
+  overrides?: RoundGenerationOverrides,
 ): RoundConfig {
-  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
-  const resolvedRandom =
-    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
-  return createLevelOneRound("load", getLevelOneRoundProfile(isMobile), resolvedRandom);
+  return createLevelOneRound(
+    "load",
+    getLevelOneRoundProfile(isMobile, overrides),
+    random,
+  );
 }
 
 export function createLevelOnePackRound(
-  isMobileOrRandom: boolean | (() => number) = false,
+  isMobile = false,
   random: () => number = Math.random,
+  overrides?: RoundGenerationOverrides,
 ): RoundConfig {
-  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
-  const resolvedRandom =
-    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
-  return createLevelOneRound("pack", getLevelOneRoundProfile(isMobile), resolvedRandom);
+  return createLevelOneRound(
+    "pack",
+    getLevelOneRoundProfile(isMobile, overrides),
+    random,
+  );
 }
 
 export function createLevelOneShipRound(
-  isMobileOrRandom: boolean | (() => number) = false,
+  isMobile = false,
   random: () => number = Math.random,
+  overrides?: RoundGenerationOverrides,
 ): RoundConfig {
-  const isMobile = typeof isMobileOrRandom === "boolean" ? isMobileOrRandom : false;
-  const resolvedRandom =
-    typeof isMobileOrRandom === "function" ? isMobileOrRandom : random;
-  return createLevelOneRound("ship", getLevelOneRoundProfile(isMobile), resolvedRandom);
+  return createLevelOneRound(
+    "ship",
+    getLevelOneRoundProfile(isMobile, overrides),
+    random,
+  );
 }

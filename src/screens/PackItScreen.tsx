@@ -197,12 +197,32 @@ const RETURN_ANIMATION_MS = 220;
 const PACK_HOLD_DELAY_MS = 300;
 const PACK_HOLD_INTERVAL_MS = 150;
 const SHIP_RESULT_DELAY_MS = 500;
+const DESKTOP_DOCK_HEIGHT_PX = 15.25 * 16;
+const DESKTOP_TUBE_MIN_CAPACITY = 6;
+const DESKTOP_TUBE_MAX_CAPACITY = 11;
+const DESKTOP_TUBE_VERTICAL_RESERVE_PX = 100;
 const ROUND_LABELS: Record<RoundName, string> = {
   load: "Load",
   pack: "Pack",
   ship: "Ship",
 };
 const ROUND_SEQUENCE: RoundName[] = ["load", "pack", "ship"];
+
+function getDesktopTubeCapacityForSceneHeight(sceneHeight: number) {
+  const availableTubeHeight = Math.max(
+    0,
+    sceneHeight - DESKTOP_TUBE_VERTICAL_RESERVE_PX,
+  );
+  const itemSizePx = 48;
+  const stackStepPx = itemSizePx + 8;
+  const estimatedCapacity =
+    Math.floor(Math.max(0, availableTubeHeight - itemSizePx) / stackStepPx) + 1;
+
+  return Math.max(
+    DESKTOP_TUBE_MIN_CAPACITY,
+    Math.min(DESKTOP_TUBE_MAX_CAPACITY, estimatedCapacity),
+  );
+}
 
 function renderHighlightedQuestion(
   text: string,
@@ -250,11 +270,11 @@ function DigitalCount({
 }) {
   return (
     <div
-      className="digital-meter rounded-2xl px-3 py-2 text-[1.6rem] leading-none"
+      className="digital-meter rounded-[1.75rem] px-3 py-2 text-[1.6rem] leading-none"
       style={{
-        background: "#0f172a",
+        background: "rgba(15,23,42,0.7)",
         boxShadow:
-          "0 0 0 3px rgba(2,6,23,0.95), 0 10px 22px rgba(2,6,23,0.52)",
+          "0 0 0 1px rgba(103,232,249,0.08), 0 0 18px rgba(103,232,249,0.12), 0 10px 22px rgba(2,6,23,0.52), inset 0 0 18px rgba(255,255,255,0.03)",
         color,
         textShadow: `0 0 12px ${glow}, 0 0 22px ${glowOuter}`,
       }}
@@ -1348,10 +1368,20 @@ export default function PackItScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
   const isMobileLandscape = useIsMobileLandscape();
   const isMobile = useIsCoarsePointer();
+  const [desktopTubeCapacity, setDesktopTubeCapacity] = useState(() =>
+    typeof window === "undefined"
+      ? DESKTOP_TUBE_MAX_CAPACITY
+      : getDesktopTubeCapacityForSceneHeight(
+          Math.max(0, window.innerHeight - DESKTOP_DOCK_HEIGHT_PX),
+        ),
+  );
   const [roundName, setRoundName] = useState<RoundName>("load");
   const round = useMemo(
-    () => makeRound(1, roundName, isMobile),
-    [isMobile, roundName],
+    () =>
+      makeRound(1, roundName, isMobile, {
+        maxUnitCount: isMobile ? undefined : desktopTubeCapacity,
+      }),
+    [desktopTubeCapacity, isMobile, roundName],
   );
   const [questionIndex, setQuestionIndex] = useState(0);
   const [items, setItems] = useState<PackedItem[]>(() =>
@@ -1438,6 +1468,30 @@ export default function PackItScreen() {
   const autoExpandCalculatorTimerRef = useRef<number | null>(null);
   const itemsRef = useRef<PackedItem[]>(items);
 
+  useEffect(() => {
+    if (isMobile || typeof window === "undefined") {
+      return;
+    }
+
+    const measureDesktopTubeCapacity = () => {
+      const sceneHeight = Math.max(
+        0,
+        window.innerHeight - DESKTOP_DOCK_HEIGHT_PX,
+      );
+      const nextCapacity = getDesktopTubeCapacityForSceneHeight(sceneHeight);
+      setDesktopTubeCapacity((current) =>
+        current === nextCapacity ? current : nextCapacity,
+      );
+    };
+
+    measureDesktopTubeCapacity();
+    window.addEventListener("resize", measureDesktopTubeCapacity);
+
+    return () => {
+      window.removeEventListener("resize", measureDesktopTubeCapacity);
+    };
+  }, [isMobile]);
+
   const question = round.questions[questionIndex];
   const isTapFillRound = question.round === "pack" || question.round === "ship";
   const containers = Array.from({ length: question.groupsA }, (_, index) =>
@@ -1513,10 +1567,9 @@ export default function PackItScreen() {
   const containerStackLiftPx = 8;
   const containerStackGapPx = 8;
   const containerStackStepPx = itemSizePx + containerStackGapPx;
-  const desktopVisibleTubeCapacity = 6;
   const visibleTubeCapacity = isMobileLandscape
     ? question.unitRate
-    : Math.min(question.unitRate, desktopVisibleTubeCapacity);
+    : desktopTubeCapacity;
   const containerInnerMinHeightPx =
     itemSizePx + Math.max(0, visibleTubeCapacity - 1) * containerStackStepPx;
   const containerMinHeightPx = isMobileLandscape
@@ -1527,7 +1580,7 @@ export default function PackItScreen() {
     Math.round(itemSizePx * 1.9),
   );
   const containerStripGapPx = Math.max(18, Math.round(itemSizePx * 0.8));
-  const containerStripBottomOffsetPx = isMobileLandscape ? 10 : 64;
+  const containerStripBottomOffsetPx = isMobileLandscape ? 10 : 12;
   const containerSnapZonePaddingPx = Math.max(
     18,
     Math.round(itemSizePx * 0.55),
@@ -4500,28 +4553,6 @@ export default function PackItScreen() {
                         </button>
                       </div>
                     ) : null}
-                    {!isMobileLandscape ? (
-                      <div
-                        className="pointer-events-none absolute left-0 right-0 z-[12]"
-                        style={lowerCountsStyle}
-                      >
-                        <div className="flex">
-                          <div
-                            className="flex justify-center"
-                            style={{ width: `${sourcePanelWidthPercent}%` }}
-                          >
-                            <DigitalCount value={remainingItems.length} />
-                          </div>
-                          <div
-                            className="flex justify-center"
-                            style={{ width: `${containerPanelWidthPercent}%` }}
-                          >
-                            <DigitalCount value={packedItemsTotal} />
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-
                     <div
                       className="relative z-[3] grid h-full gap-0 px-0 pb-0 pt-7"
                       style={{
@@ -4788,6 +4819,28 @@ export default function PackItScreen() {
                         </div>
                       </div>
                     </div>
+
+                    {!isMobileLandscape ? (
+                      <div
+                        className="pointer-events-none absolute left-0 right-0 z-[20]"
+                        style={lowerCountsStyle}
+                      >
+                        <div className="flex">
+                          <div
+                            className="flex justify-center"
+                            style={{ width: `${sourcePanelWidthPercent}%` }}
+                          >
+                            <DigitalCount value={remainingItems.length} />
+                          </div>
+                          <div
+                            className="flex justify-center"
+                            style={{ width: `${containerPanelWidthPercent}%` }}
+                          >
+                            <DigitalCount value={packedItemsTotal} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {dragState?.isLifted
                       ? (() => {

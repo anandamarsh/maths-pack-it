@@ -48,3 +48,7 @@ export interface RoundGenerationProfile {
   maxGroupCount: number;
   maxUnitCount: number;
 }
+
+export interface RoundGenerationOverrides {
+  maxUnitCount?: number;
+}
