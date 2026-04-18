@@ -191,6 +191,11 @@ function isMathSymbolToken(token: string): boolean {
   return token.includes("=") || token.includes("∴") || token.includes("÷");
 }
 
+function isMathWordToken(token: string): boolean {
+  const normalized = token.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return normalized === "per";
+}
+
 const QUESTION_KEYWORD_COLOR = "#facc15";
 const QUESTION_SYMBOL_COLOR = "#66ff66";
 const RETURN_ANIMATION_MS = 220;
@@ -308,6 +313,10 @@ function getDesktopPlayfieldWidth(viewportWidth: number) {
   return Math.max(0, viewportWidth - DESKTOP_RIGHT_RAIL_WIDTH_PX);
 }
 
+function stripTrailingPeriod(text: string) {
+  return text.replace(/\.\s*$/, "");
+}
+
 function renderHighlightedQuestion(
   text: string,
   colors?: {
@@ -323,7 +332,7 @@ function renderHighlightedQuestion(
       <span key={`${part}-${index}`}>
         <span
           style={
-            isMathSymbolToken(part)
+            isMathSymbolToken(part) || isMathWordToken(part)
               ? { color: colors?.symbol ?? "#86efac" }
               : isNumericToken(part)
                 ? { color: QUESTION_KEYWORD_COLOR }
@@ -1522,6 +1531,7 @@ export default function PackItScreen() {
   const [showInsufficientItemNotice, setShowInsufficientItemNotice] =
     useState(false);
   const [autoExpandCalculator, setAutoExpandCalculator] = useState(false);
+  const [desktopRevealLineCount, setDesktopRevealLineCount] = useState(0);
   const nextComboIdRef = useRef(1);
   const containerRefs = useRef<Array<HTMLDivElement | null>>([]);
   const sourceAreaRef = useRef<HTMLDivElement | null>(null);
@@ -1539,6 +1549,8 @@ export default function PackItScreen() {
   const questionTypeIntervalRef = useRef<number | null>(null);
   const stepTypeIntervalRef = useRef<number | null>(null);
   const stepTypeDelayRef = useRef<number | null>(null);
+  const desktopRevealTimerRef = useRef<number | null>(null);
+  const desktopNextButtonTimerRef = useRef<number | null>(null);
   const displaySyncLockRef = useRef<number | null>(null);
   const keypadDebounceRef = useRef<number | null>(null);
   const keypadAdjustTimersRef = useRef<number[]>([]);
@@ -1712,6 +1724,12 @@ export default function PackItScreen() {
 
   useEffect(() => {
     return () => {
+      if (desktopRevealTimerRef.current !== null) {
+        window.clearTimeout(desktopRevealTimerRef.current);
+      }
+      if (desktopNextButtonTimerRef.current !== null) {
+        window.clearTimeout(desktopNextButtonTimerRef.current);
+      }
       if (autoExpandCalculatorTimerRef.current !== null) {
         window.clearTimeout(autoExpandCalculatorTimerRef.current);
       }
@@ -1779,14 +1797,21 @@ export default function PackItScreen() {
 
     if (!showUnitReveal) {
       setTypedStepLengths([]);
+      setDesktopRevealLineCount(0);
       setShowNextQuestionButton(false);
       setRevealCtaMode(null);
       return;
     }
 
     const steps = question.blackboardSteps;
-    setTypedStepLengths(steps.map((line) => line.length));
-    setShowNextQuestionButton(true);
+    if (isDesktopLayout) {
+      setTypedStepLengths([]);
+      setDesktopRevealLineCount(1);
+      setShowNextQuestionButton(false);
+    } else {
+      setTypedStepLengths(steps.map((line) => line.length));
+      setShowNextQuestionButton(true);
+    }
 
     return () => {
       if (stepTypeIntervalRef.current !== null) {
@@ -1797,8 +1822,73 @@ export default function PackItScreen() {
         window.clearTimeout(stepTypeDelayRef.current);
         stepTypeDelayRef.current = null;
       }
+      if (desktopRevealTimerRef.current !== null) {
+        window.clearTimeout(desktopRevealTimerRef.current);
+        desktopRevealTimerRef.current = null;
+      }
+      if (desktopNextButtonTimerRef.current !== null) {
+        window.clearTimeout(desktopNextButtonTimerRef.current);
+        desktopNextButtonTimerRef.current = null;
+      }
     };
-  }, [question.blackboardSteps, questionResetKey, showUnitReveal]);
+  }, [isDesktopLayout, question.blackboardSteps, questionResetKey, showUnitReveal]);
+
+  useEffect(() => {
+    if (!isDesktopLayout || !showUnitReveal) {
+      return;
+    }
+
+    const totalLines = question.blackboardSteps.length;
+    if (desktopRevealLineCount >= totalLines) {
+      if (showNextQuestionButton || desktopNextButtonTimerRef.current !== null) {
+        return;
+      }
+
+      desktopNextButtonTimerRef.current = window.setTimeout(() => {
+        desktopNextButtonTimerRef.current = null;
+        setShowNextQuestionButton(true);
+      }, 2000);
+      return;
+    }
+
+    desktopRevealTimerRef.current = window.setTimeout(() => {
+      desktopRevealTimerRef.current = null;
+      setDesktopRevealLineCount((current) => Math.min(totalLines, current + 1));
+    }, 1000);
+
+    return () => {
+      if (desktopRevealTimerRef.current !== null) {
+        window.clearTimeout(desktopRevealTimerRef.current);
+        desktopRevealTimerRef.current = null;
+      }
+      if (desktopNextButtonTimerRef.current !== null) {
+        window.clearTimeout(desktopNextButtonTimerRef.current);
+        desktopNextButtonTimerRef.current = null;
+      }
+    };
+  }, [
+    desktopRevealLineCount,
+    isDesktopLayout,
+    question.blackboardSteps,
+    showNextQuestionButton,
+    showUnitReveal,
+  ]);
+
+  useEffect(() => {
+    if (!isDesktopLayout || !showUnitReveal || desktopRevealLineCount <= 0) {
+      return;
+    }
+
+    playRipple(300);
+  }, [desktopRevealLineCount, isDesktopLayout, showUnitReveal]);
+
+  useEffect(() => {
+    if (!isDesktopLayout || !showUnitReveal || !showNextQuestionButton) {
+      return;
+    }
+
+    playRipple(300);
+  }, [isDesktopLayout, showNextQuestionButton, showUnitReveal]);
 
   useEffect(() => {
     if (displaySyncLockRef.current !== null) {
@@ -4239,9 +4329,13 @@ export default function PackItScreen() {
   }, [isRoundComplete, roundName]);
 
   const visibleStepLines = showUnitReveal
-    ? question.blackboardSteps
-        .map((line, index) => line.slice(0, typedStepLengths[index] ?? 0))
-        .filter((line) => line.length > 0)
+    ? isDesktopLayout
+      ? question.blackboardSteps
+          .slice(0, desktopRevealLineCount)
+          .map(stripTrailingPeriod)
+      : question.blackboardSteps
+          .map((line, index) => line.slice(0, typedStepLengths[index] ?? 0))
+          .filter((line) => line.length > 0)
     : [];
   const visibleQuestionText = question.questionText.slice(
     0,
@@ -4319,7 +4413,7 @@ export default function PackItScreen() {
     toggleCalculatorMinimized: () => void;
   }) => {
     const messageTheme = chromeTheme.messagePanel;
-    const showBoxCornerCta = showNextQuestionButton;
+    const showBoxCornerCta = showNextQuestionButton && !isDesktopLayout;
     const isDesktopExpanded = !isMobile && !calculatorMinimized;
     const questionPanelHeight = calculatorMinimized
       ? "calc(4.5rem - 4px)"
@@ -4392,8 +4486,9 @@ export default function PackItScreen() {
             className="flex-1"
             style={{
               background: "transparent",
-              maxHeight: calculatorMinimized ? "0px" : "14rem",
-              opacity: calculatorMinimized ? 0 : 1,
+              maxHeight:
+                calculatorMinimized || isDesktopLayout ? "0px" : "14rem",
+              opacity: calculatorMinimized || isDesktopLayout ? 0 : 1,
               overflow: "hidden",
               transition: `max-height ${DOCK_TRANSITION}, opacity ${DOCK_TRANSITION}`,
             }}
@@ -4698,6 +4793,7 @@ export default function PackItScreen() {
                         className="relative flex h-full items-center bg-transparent"
                         style={{
                           boxShadow: "none",
+                          marginLeft: isDesktopLayout ? "1rem" : undefined,
                           paddingLeft: `${sourcePaddingX}px`,
                           paddingRight: `${sourcePaddingX}px`,
                           paddingTop: `${sourcePaddingTop}px`,
@@ -4795,6 +4891,99 @@ export default function PackItScreen() {
                               ),
                             )}
                         </div>
+                        {isDesktopLayout && showUnitReveal ? (
+                          <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
+                            <div className="flex w-full flex-col items-stretch">
+                              <div
+                                className="ml-[7%] mr-[7%] flex max-w-[86%] flex-col items-start text-left"
+                                style={{ gap: "0.35rem" }}
+                              >
+                                {question.blackboardSteps.map((line, index) => (
+                                  <div key={`desktop-answer-${index}`} className="w-full">
+                                    <div
+                                      className="font-arcade w-full font-semibold leading-relaxed"
+                                      style={{
+                                        fontSize: "1.15rem",
+                                        color: chromeTheme.messagePanel.text,
+                                        opacity:
+                                          index < desktopRevealLineCount ? 1 : 0,
+                                        transition:
+                                          "opacity 220ms cubic-bezier(0.22,0.72,0.2,1)",
+                                        textShadow:
+                                          "0 2px 12px rgba(2,6,23,0.34)",
+                                      }}
+                                    >
+                                      {renderHighlightedQuestion(
+                                        stripTrailingPeriod(line),
+                                        {
+                                          normal: chromeTheme.messagePanel.text,
+                                          highlight:
+                                            chromeTheme.messagePanel.highlight,
+                                          symbol: QUESTION_SYMBOL_COLOR,
+                                        },
+                                      )}
+                                    </div>
+                                    {index === 1 ? (
+                                      <div
+                                        aria-hidden="true"
+                                        className="w-full"
+                                        style={{
+                                          marginTop: "0.45rem",
+                                          paddingTop: "0.45rem",
+                                          borderTop:
+                                            "2px solid rgba(148,163,184,0.35)",
+                                          opacity:
+                                            index < desktopRevealLineCount ? 1 : 0,
+                                          transition:
+                                            "opacity 220ms cubic-bezier(0.22,0.72,0.2,1)",
+                                        }}
+                                      />
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                              {showNextQuestionButton ? (
+                                <div
+                                  className="pointer-events-auto flex w-full justify-end"
+                                  style={{ marginTop: "2rem" }}
+                                >
+                                  <button
+                                    ref={nextQuestionButtonRef}
+                                    type="button"
+                                    onClick={
+                                      revealCtaMode === "retry"
+                                        ? handleNowYourTurn
+                                        : goToNextQuestion
+                                    }
+                                    className="arcade-button inline-flex h-[42px] items-center rounded-full px-5 font-arcade text-[0.86rem] font-bold leading-none text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 active:scale-[0.98]"
+                                  >
+                                    {revealCtaMode === "retry"
+                                      ? "Now you try it"
+                                      : "Next"}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div
+                                  className="flex w-full justify-end"
+                                  style={{
+                                    marginTop: "2rem",
+                                    opacity: 0,
+                                    pointerEvents: "none",
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="arcade-button inline-flex h-[42px] items-center rounded-full px-5 font-arcade text-[0.86rem] font-bold leading-none text-white"
+                                    tabIndex={-1}
+                                    aria-hidden="true"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div
