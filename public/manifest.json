@@ -9,7 +9,7 @@
   "orientation": "landscape",
   "background_color": "#0d1b35",
   "theme_color": "#0d1b35",
-  "description": "Build: __BUILD_STAMP__\n\nPack It! is an Interactive Maths game about the unitary method. Children pack items into equal groups, see the unit rate emerge on a blackboard, and then use that rate to solve scaling problems.",
+  "description": "Build: __BUILD_STAMP__\n\nPack It! is an Interactive Maths game about the rates. Children pack items into equal groups, see the unit rate emerge on a blackboard, and then use that rate to solve scaling problems.",
   "icons": [
     { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
     {
@@ -36,16 +36,16 @@
     "/screenshots/pack-it-screenshot-1.jpg",
     "/screenshots/pack-it-screenshot-2.jpg"
   ],
-  "tags": ["unitary method", "ratios", "grouping", "packing"],
+  "tags": ["rates", "division", "grouping", "packing"],
   "subjects": ["mathematics"],
-  "skills": ["unitary method", "division", "equal grouping"],
+  "skills": ["rates", "division", "equal grouping"],
   "teachesLevels": [
     {
-      "label": "Uses the unitary method to solve ratio and rate problems through equal-group packing scenarios",
+      "label": "Uses the rates to solve ratio and rate problems through equal-group packing scenarios",
       "stageLabel": "Stage 4",
       "syllabusCode": "MA4-RAT-C-01",
       "syllabusUrl": "https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content/stage-4/fa0927d16d",
-      "syllabusDescription": "Solves problems involving ratios and rates using the unitary method."
+      "syllabusDescription": "Solves problems involving division and rates using the rates."
     }
   ],
   "githubUrl": "https://github.com/anandamarsh/maths-pack-it",
