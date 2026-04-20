@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import PhantomHand from "../components/PhantomHand";
 import GameLayout from "../components/GameLayout";
+import PackItLevelOneScreen from "./PackItLevelOneScreen";
 import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import {
@@ -1484,7 +1485,7 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
   });
 }
 
-export default function PackItScreen() {
+function PackItLevelTwoScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
   const { locale } = useLocale();
   const t = useT();
@@ -5656,3 +5657,11 @@ export default function PackItScreen() {
     </>
   );
 }
+
+// The old L1 drag mechanic (PackItLevelTwoScreen above) is preserved for
+// the upcoming L2 wiring. On this branch the game plays the new L1
+// tube-replicator mechanic implemented in PackItLevelOneScreen.
+export default function PackItScreen() {
+  return <PackItLevelOneScreen />;
+}
+void PackItLevelTwoScreen;
