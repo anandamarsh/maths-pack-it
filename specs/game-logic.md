@@ -66,25 +66,28 @@ const GROUPING_PAIRS: GroupingPair[] = [
 ### L1 generator — `makeL1Question(round, usedPairs)`
 
 ```typescript
-// Constraints: groups 2–4, unit 2–6, total = groups × unit ≤ 24
-// Subtype: always 'find-unit'
-// Round Load: answer appears automatically (no keypad)
-// Round Pack/Ship: child types unit rate
+// New L1: scaling up a fully filled "1 box".
+// Given: unitRate (items per box) and groups (target box count). Unknown: total.
+// Subtype: always 'find-total'
+// Constraints: unit 3–8, groups 3–8, total = groups × unit, target total ≤ 64
+// Round Load: child replicates tubes; count + progress bar update live; answer appears automatically when target reached
+// Round Pack: child replicates tubes freely but must type the total into the keypad to commit; count + progress bar still live
+// Round Ship: child must commit total on keypad first; tubes then animate to confirm (live count + auto-reveal disabled)
 
 function makeL1Question(round: 'load'|'pack'|'ship', usedPairs: GroupingPair[]): PackQuestion {
   const pair = pickPair(usedPairs);
-  const groups = randInt(2, 4);
-  const unit = randInt(2, 6);
+  const unit = randInt(3, 8);
+  const groups = randInt(3, 8);
   const total = groups * unit;
   return {
-    level: 1, round, subtype: 'find-unit', pair,
+    level: 1, round, subtype: 'find-total', pair,
     totalA: total, groupsA: groups, unitRate: unit,
-    answer: unit,
-    answerUnit: `${pair.itemPlural} per ${pair.container}`,
-      questionText: `There are ${total} ${pair.itemPlural} that have to be packed equally into ${groups} ${pair.containerPlural}. How many shall each ${pair.container} have?`,
+    answer: total,
+    answerUnit: pair.itemPlural,
+    questionText: `If 1 ${pair.container} holds ${unit} ${pair.itemPlural}, how many ${pair.itemPlural} would be in ${groups} ${pair.containerPlural}?`,
     blackboardSteps: [
-      `${groups} ${pair.containerPlural} → ${total} ${pair.itemPlural}`,
-      `1 ${pair.container} → ${unit} ${pair.itemPlural}`,
+      `1 ${pair.container} = ${unit} ${pair.itemPlural}.`,
+      `${groups} ${pair.containerPlural} = ${groups} × ${unit} = ${total} ${pair.itemPlural}.`,
     ],
     isFraction: false,
   };
@@ -94,43 +97,29 @@ function makeL1Question(round: 'load'|'pack'|'ship', usedPairs: GroupingPair[]):
 ### L2 generator — `makeL2Question(round, usedPairs)`
 
 ```typescript
-// Sub-types: 'find-total' (unit × groups) or 'find-groups' (total ÷ unit), randomly chosen
-// Constraints: groups 2–8, unit 2–8, total ≤ 48, whole numbers only
+// Former L1 mechanic relocated here: discover the unit by dragging items
+// from a left source area into right-hand containers.
+// Subtype: always 'find-unit'
+// Constraints: groups 2–4, unit 2–6, total = groups × unit ≤ 24, whole numbers only
 
 function makeL2Question(round: 'load'|'pack'|'ship', usedPairs: GroupingPair[]): PackQuestion {
   const pair = pickPair(usedPairs);
-  const subtype = Math.random() < 0.5 ? 'find-total' : 'find-groups';
-  const groups = randInt(2, 8);
-  const unit = randInt(2, 8);
+  const groups = randInt(2, 4);
+  const unit = randInt(2, 6);
   const total = groups * unit;
-
-  if (subtype === 'find-total') {
-    return {
-      level: 2, round, subtype, pair,
-      totalA: total, groupsA: groups, unitRate: unit,
-      answer: total,
-      answerUnit: pair.itemPlural,
-      questionText: `Each ${pair.container} holds ${unit} ${pair.itemPlural}. You have ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} in total?`,
-      blackboardSteps: [
-        `1 ${pair.container} → ${unit} ${pair.itemPlural}`,
-        `${groups} ${pair.containerPlural} → ${groups} × ${unit} = ${total} ${pair.itemPlural}`,
-      ],
-      isFraction: false,
-    };
-  } else {
-    return {
-      level: 2, round, subtype, pair,
-      totalA: total, groupsA: groups, unitRate: unit,
-      answer: groups,
-      answerUnit: pair.containerPlural,
-      questionText: `There are ${total} ${pair.itemPlural}. Each ${pair.container} holds ${unit}. How many ${pair.containerPlural} do you need?`,
-      blackboardSteps: [
-        `1 ${pair.container} → ${unit} ${pair.itemPlural}`,
-        `${total} ${pair.itemPlural} ÷ ${unit} = ${groups} ${pair.containerPlural}`,
-      ],
-      isFraction: false,
-    };
-  }
+  return {
+    level: 2, round, subtype: 'find-unit', pair,
+    totalA: total, groupsA: groups, unitRate: unit,
+    answer: unit,
+    answerUnit: `${pair.itemPlural} per ${pair.container}`,
+    questionText: `There are ${total} ${pair.itemPlural} that have to be packed equally into ${groups} ${pair.containerPlural}. How many shall each ${pair.container} have?`,
+    blackboardSteps: [
+      `Total ${pair.itemPlural} = ${total}.`,
+      `Total ${pair.containerPlural} = ${groups}.`,
+      `∴ ${pair.itemPlural} per ${pair.container} = ${total} ÷ ${groups} = ${unit}.`,
+    ],
+    isFraction: false,
+  };
 }
 ```
 

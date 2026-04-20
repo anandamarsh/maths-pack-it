@@ -8,9 +8,9 @@ import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import {
   getLocalizedInsufficientItemsLabel,
-  getLocalizedLevelOneBlackboardSteps,
-  getLocalizedLevelOneQuestionText,
-} from "../calculations/level-1/round-1.ts";
+  getLocalizedLevelTwoBlackboardSteps,
+  getLocalizedLevelTwoQuestionText,
+} from "../calculations/level-2/round-1.ts";
 import { getDemoConfig } from "../demoMode";
 import {
   useIsCoarsePointer,
@@ -1505,7 +1505,11 @@ export default function PackItScreen() {
   const [roundName, setRoundName] = useState<RoundName>("load");
   const round = useMemo(
     () =>
-      makeRound(1, roundName, isMobile, {
+      // TODO(L1): The current playfield renders the L2 drag mechanic (former L1).
+      // The new L1 "replicate the filled test tube" mechanic is implemented in
+      // src/calculations/level-1/round-1.ts but the tube-replication UI + progress
+      // bar is not yet wired into this screen. Until then we render L2 content here.
+      makeRound(2, roundName, isMobile, {
         maxGroupCount: isMobile ? undefined : desktopGroupCapacity,
         maxUnitCount: isMobile ? undefined : desktopTubeCapacity,
       }),
@@ -1639,11 +1643,11 @@ export default function PackItScreen() {
   const packedItemsTotal = items.length - remainingItems.length;
   const canSubmit = !showNextQuestionButton;
   const localizedQuestionText = useMemo(
-    () => getLocalizedLevelOneQuestionText(question, locale),
+    () => getLocalizedLevelTwoQuestionText(question, locale),
     [locale, question],
   );
   const localizedBlackboardSteps = useMemo(
-    () => getLocalizedLevelOneBlackboardSteps(question, locale),
+    () => getLocalizedLevelTwoBlackboardSteps(question, locale),
     [locale, question],
   );
   const localizedInsufficientItemsText = useMemo(

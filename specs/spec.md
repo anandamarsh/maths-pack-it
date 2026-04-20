@@ -24,9 +24,10 @@ A **bottom steps panel** displays the unitary-method working as it is revealed t
 
 | Context | Interaction |
 |---------|-------------|
-| L1 Load round | Drag fixed item combos into containers |
-| L1 Pack / Ship rounds | Tap container to add one item; hold to stream |
-| L2–L3 all rounds | Type answer on keypad → animation plays |
+| L1 all rounds | Add (+) or remove (−) test tubes that each start pre-filled with the unit count; keypad commits answer from Round 2 |
+| L2 Load round | Drag fixed item combos from the left source into containers on the right |
+| L2 Pack / Ship rounds | Tap container to add one item; hold to stream |
+| L3 all rounds | Type answer on keypad → animation plays |
 | L4 all rounds | Type answer on keypad → no animation |
 
 Keypad: standard platform numeric keypad (digits, backspace, decimal, Submit). It remains visible in every round as part of the consistent template layout; in guided rounds it can act as a passive display rather than an active input.
@@ -39,6 +40,7 @@ Keypad: standard platform numeric keypad (digits, backspace, decimal, Submit). I
 - **No floating instructional text inside the playfield**
 - **Overall theme**: dark UI chrome and dark play surface, not a light worksheet theme
 - **Each container shows a digital counter** in odometer / digital-clock style at its top-right corner; the count increments and decrements live as items move in and out
+- **L1 only — progress bar under the tubes**: horizontal fractional bar. Filled segment = current tube count ÷ target tube count. Filled colour is blue while under 100%. At exactly 100% it turns green and flashes to signal "done". If the child overshoots, it turns red and flashes / beeps to signal "too far". Unfilled portion is neutral grey.
 - **Bottom dock**:
   - question panel
   - steps / revealed working panel
@@ -59,39 +61,64 @@ Keypad: standard platform numeric keypad (digits, backspace, decimal, Submit). I
 
 ## Questions / problems
 
-### L1 — Discover the unit
-Question language should follow worksheet / IXL-style natural word-problem phrasing, with a large bank of sentence patterns rather than one repeated stem. Runtime values should be slotted into varied templates such as:
+### L1 — Scale the unit (multiplication, replicate a full box)
+L1 introduces the unitary method through **multiplication only**. The question always gives a fully filled "1 box" as a starting picture and asks the child to scale it up.
+
+Question phrasing follows natural worksheet / IXL-style sentences such as:
+
+> "If 1 box has [unit] [items], how many [items] would be in [groups] boxes?"
+> "Each [container] holds [unit] [items]. How many [items] are in [groups] [containers]?"
+> "One [container] is filled with [unit] [items]. [Groups] identical [containers] hold how many [items] in total?"
+
+Wording bank should be broad enough that a short round feels varied; no two consecutive generated questions should use the same wording template.
+
+Steps panel should reveal working such as:
+
+`1 box = 5 apples.`
+`5 boxes = 5 × 5 = 25 apples.`
+
+These appear with the same typewriter/click sequence used elsewhere, one line at a time, ~1 s gap before the next line starts after a correct submit. Numbers and multiplication-keyword words (`×`, `times`, `each`, `per`, `in total`) are highlighted yellow; `∴`, `=`, and `×` are green. After the final line is typed, wait ~3 s and show an inline `Next question` / `Now you try it` button on that same line (same rules as other levels).
+
+Example: "If 1 box has 5 apples, how many apples are in 7 boxes?" → 35.
+
+Numbers: unit 3–8, groups 3–8, target total ≤ 64. Whole numbers only.
+
+**L1 playfield mechanic — test-tube replicator**
+
+- No left / source side at all. The playfield is the right-hand "packed" side only.
+- Round starts with **one static test tube** already pre-filled with `unit` items; that tube represents "1 box" stated in the question. It has no badges and cannot be deleted.
+- Every tube the child adds beyond the first shows two badges:
+  - **+** badge (top-right): tapping duplicates that tube (creates one more identical full tube).
+  - **−** badge (top-left): tapping deletes that tube immediately — no confirmation.
+- The **count readout** at the bottom multiplies / subtracts in steps of `unit` as tubes are added/removed (starts at `unit`; with `k` tubes it reads `k × unit`).
+- A **progress bar** sits under the tubes and shows fill = (current tube count) / (target tube count):
+  - Starts at 1 / target filled.
+  - Fills as tubes are added.
+  - At **exactly 100%** it turns green and **flashes** to cue the child that they've reached the answer. This is the "done" signal.
+  - If the child goes **beyond 100%** the bar turns **red** and flashes / beeps to cue "too far". Removing tubes returns it to blue/green as appropriate.
+  - Default filled colour below 100% is **blue**.
+
+### L2 — Discover the unit (division, drag from source)
+L2 keeps the packing mechanic that was previously shown at L1: items arrive loose on a **left source area** and must be dragged in groups into the **right containers**.
+
+Question phrasing stays the IXL-style divide-equally wording, e.g.:
 
 > "There are [total] [items] that have to be packed equally into [groups] [containers]. How many shall each [container] have?"
 > "[total] [items] are shared equally among [groups] [containers]. How many [items] should go in each [container]?"
-> "[total] [items] need to be divided evenly into [groups] [containers]. How many [items] will each [container] hold?"
 
-The wording bank should be broad enough that a short round feels varied rather than repetitive; no two consecutive generated questions should use the same wording template.
-
-Child packs physically. Steps panel should reveal full worked lines such as:
+Steps panel reveals:
 
 `Total gems = 6.`
 `Total chests = 3.`
 `∴ Gems per chest = 6 ÷ 3 = 2.`
 
-These should appear using the same character-by-character typewriter/click sequence as the question, one line at a time with about a 1 second gap before the next line starts after a correct submit, or after the robot finishes its correct demonstration. Numbers and division-keyword words should be highlighted yellow; `∴`, `=`, and `÷` should be green. After the full final line is typed, wait about 3 seconds and then show an inline filled button on that same final line. The inline button should be compact enough not to jitter the line height noticeably. For a normal correct solve it should say `Next question` and advance only when pressed. For a robot-demonstrated solve it should say `Now you try it` and reset that same question when pressed.
+Numbers and division-keyword words highlighted yellow; `∴`, `=`, and `÷` green. Inline `Next question` / `Now you try it` button rules same as other levels.
 
 Example: "There are 20 cupcakes that have to be packed equally into 5 boxes. How many shall each box have?" → unit = 4 cupcakes per box.
 
 Numbers: groups 2–4, unit 2–6, total ≤24. Whole numbers only.
 
-Load-round drag rule: the child does not pick up just one loose item. Picking one loose item should also select enough following loose items to match the number of boxes in that question, skipping over any empty source gaps left by earlier moves. Those linked items should first glow in place, then join the main item when the drag actually lifts. Only the top/right first box is an active drop target; lower boxes are read-only display boxes. When the combo is dropped, all selected items should first land in the top box together, then the extra items should animate downward into the lower boxes so the final equal distribution is shown. Right-side box-to-box redistribution is not allowed. Dragging a placed combo back should only be possible from the top box, and it should bring that remembered combo back to the source side as a group, preserving the source gaps/slots they came from.
-
-### L2 — Use the unit (one step)
-Two sub-types, randomly mixed:
-
-**Type A** — find total: "Each [container] holds [unit] [items]. You have [groups] [containers]. How many [items] in total?"
-Example: "Each bowl holds 6 fish. You have 7 bowls. How many fish in total?" → 42
-
-**Type B** — find groups: "There are [total] [items] and each [container] holds [unit]. How many [containers] do you need?"
-Example: "There are 48 eggs and each carton holds 6. How many cartons?" → 8
-
-Numbers: groups 2–8, unit 2–8, total ≤48. Whole numbers only.
+Load-round drag rule (unchanged from the former L1): the child does not pick up just one loose item. Picking one loose item selects enough following loose items to match the number of boxes, skipping empty source gaps. Linked items glow first, then follow when the drag lifts. Only the top/right first box is an active drop target; lower boxes are read-only display boxes. When the combo is dropped, all selected items first land in the top box and then the extras animate down into the lower boxes. Right-side box-to-box redistribution is not allowed. Dragging a placed combo back is only possible from the top box and returns the combo to the source side as a group preserving its source gaps.
 
 ### L3 — Apply the unit (two steps, full unitary method)
 > "[Total A] [items] were packed into [groups A] [containers]. How many [containers/items] for [new value]?"
@@ -146,9 +173,9 @@ The 3 rounds within each level act as the scaffolding-removal arc:
 
 | Round | Name | What changes |
 |-------|------|-------------|
-| 1 | **Load** | Fully guided — child sees items pack; answer appears automatically; keypad stays visible as passive scaffold |
-| 2 | **Pack** | Child types answer; that number drives the animation (containers fill to that count) |
-| 3 | **Ship** | Child types answer and commits first; animation plays afterwards to confirm right/wrong |
+| 1 | **Load** | Fully guided — child experiments with the physical mechanic; the live count and progress bar update as they play; the answer appears automatically when the target is reached; keypad stays visible as passive scaffold |
+| 2 | **Pack** | Child still plays with the physical mechanic, but they must type the final answer into the keypad to commit. Count/progress bar still update live during play |
+| 3 | **Ship** | Child must type the answer first; the physical mechanic (e.g. tubes in L1) then animates to confirm. The live count and auto-reveal are disabled until after commit |
 
 This is the challenge arc — no separate named challenge round. The "Ship" round is the equivalent of Monster/Platinum in other games.
 

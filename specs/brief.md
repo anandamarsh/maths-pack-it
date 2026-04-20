@@ -17,9 +17,10 @@ This maps directly to IXL 7th Grade L.5 (Unit rates) and L.7 (Word problems usin
 | L3–L4 | MA4-RAT-C-01 | Stage 4 — solves problems involving ratios and rates (unitary method explicitly named in teaching advice) |
 
 ## Primary interaction
-- **L1 Load round**: drag individual items into containers (max 24 items on screen)
-- **L1 Pack/Ship rounds**: tap container to add items one at a time; hold to stream
-- **L2–L3 all rounds**: type answer on numeric keypad → animation plays
+- **L1 all rounds**: playfield starts with one fully filled "1 box" test tube. Child taps `+` badge on any extra tube to duplicate it and `−` badge to delete it. Count and progress bar update live. Round 2 requires keypad commit; Round 3 requires keypad commit before the tubes animate.
+- **L2 Load round**: drag fixed item combos from a left source area into right-hand containers (former L1 mechanic; max 24 items on screen)
+- **L2 Pack/Ship rounds**: tap container to add items one at a time; hold to stream
+- **L3 all rounds**: type answer on numeric keypad → animation plays
 - **L4 all rounds**: type answer on numeric keypad → no animation (pure text)
 
 ## Mechanic
@@ -29,8 +30,8 @@ Items (apples, coins, fish, etc.) are grouped into containers (crates, piggy ban
 
 | Level | Name | Concept | Question type |
 |-------|------|---------|---------------|
-| L1 | Discover the unit | Given total + groups → find unit rate | Physically pack items into containers |
-| L2 | Use the unit | Given unit rate + groups OR unit rate + total → find the missing value | One-step calculation, visual still present |
+| L1 | Scale the unit | Given unit rate + groups → find total | Replicate a full "1 box" test tube; visual multiplication |
+| L2 | Discover the unit | Given total + groups → find unit rate | Physically pack items from a left source into right containers |
 | L3 | Apply the unit | Given total + groups → find unit rate → apply to new scenario | Two-step full unitary method; fractions introduced |
 | L4 | Textbook | Any direction, any solve-for, plain text format | Identical to IXL/worksheet wording, no visual |
 
@@ -45,8 +46,8 @@ Each level has 3 rounds, named:
 
 ## Questions
 - 10 questions per round
-- **L1**: groups 2–4, unit rate 2–6, totals up to 24, whole numbers only
-- **L2**: groups 2–8, unit rate 2–8, totals up to 48, whole numbers only
+- **L1**: unit rate 3–8, groups 3–8, totals up to 64, whole numbers only
+- **L2**: groups 2–4, unit rate 2–6, totals up to 24, whole numbers only
 - **L3**: groups 2–10, unit rate 2–10, totals up to 60; fractions introduced (½, ¼, ⅓)
 - **L4**: groups 2–12, unit rate 2–10, totals up to 100; fractions and decimals
 - Numbers always generate clean answers (no remainders), except intentional fraction questions
@@ -96,10 +97,12 @@ Each level has 3 rounds, named:
 
 ## Secondary HUD elements
 - **Blackboard panel**: right 25% of canvas; chalk-style font; shows unitary working built step by step
-  - L1: `5 boxes → 20 apples` / `1 box → 4 apples`
+  - L1: `1 box = 5 apples` / `7 boxes = 7 × 5 = 35 apples`
+  - L2: `5 boxes → 20 apples` / `1 box → 4 apples`
   - L3+: `20 apples ÷ 5 boxes = 4 per box` / `8 boxes × 4 = 32 apples`
 - **Item counter badge**: small number above each container showing current fill count
 - **Unit rate badge**: appears after unit rate is established, shown as `[N] per box`
+- **L1 progress bar**: horizontal bar under the tubes. Fill fraction = current tubes ÷ target tubes. Blue under 100%, **flashing green at exactly 100% (done)**, flashing red above 100% (overshoot). Neutral grey unfilled portion.
 
 ## Sound
 - Normal rounds (L1–L3): upbeat, light arcade loop (pattern 1)

@@ -3,6 +3,11 @@ import {
   createLevelOnePackRound,
   createLevelOneShipRound,
 } from "./level-1/index.ts";
+import {
+  createLevelTwoLoadRound,
+  createLevelTwoPackRound,
+  createLevelTwoShipRound,
+} from "./level-2/index.ts";
 import type {
   Level,
   RoundConfig,
@@ -25,6 +30,15 @@ export function createRound(
   }
   if (level === 1 && round === "ship") {
     return createLevelOneShipRound(isMobile, random, overrides);
+  }
+  if (level === 2 && round === "load") {
+    return createLevelTwoLoadRound(isMobile, random, overrides);
+  }
+  if (level === 2 && round === "pack") {
+    return createLevelTwoPackRound(isMobile, random, overrides);
+  }
+  if (level === 2 && round === "ship") {
+    return createLevelTwoShipRound(isMobile, random, overrides);
   }
 
   throw new Error(`Round not implemented yet: level ${level} / ${round}`);
