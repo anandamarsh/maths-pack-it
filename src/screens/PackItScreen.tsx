@@ -89,6 +89,30 @@ type FlashFeedback = {
 type RevealCtaMode = "next" | "retry" | null;
 const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 
+function readLevelFromUrl(): number {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+
+  const parsed = Number(new URLSearchParams(window.location.search).get("level"));
+  return Number.isFinite(parsed) && parsed >= 2 ? 2 : 1;
+}
+
+function navigateToLevel(level: 1 | 2) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  if (level === 1) {
+    url.searchParams.delete("level");
+  } else {
+    url.searchParams.set("level", String(level));
+  }
+  window.history.pushState({}, "", url.toString());
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
 const QUESTION_COUNT = 10;
 const AUTOPILOT_QUESTION_COUNT = 5;
 const QUESTION_KEYWORDS = [
@@ -1685,7 +1709,6 @@ function PackItLevelTwoScreen() {
   const progressTotal = isContinuousAutopilot
     ? AUTOPILOT_QUESTION_COUNT
     : QUESTION_COUNT;
-  const currentRoundLevel = ROUND_SEQUENCE.indexOf(roundName) + 1;
   const showDevCaptureControls = import.meta.env.DEV;
   const showAnswerBanner =
     !isQuestionDemo &&
@@ -4638,16 +4661,15 @@ function PackItLevelTwoScreen() {
   const desktopRailTop = isDesktopLayout ? (
     <div className="flex flex-col gap-3" style={{ marginTop: "2rem" }}>
       <div className="flex items-center justify-center gap-2">
-        {ROUND_SEQUENCE.map((candidateRound, index) => {
-          const levelNumber = index + 1;
-          const locked = levelNumber > currentRoundLevel;
+        {[1, 2, 3].map((levelNumber) => {
+          const locked = levelNumber === 3;
           return (
             <MobileLevelButton
-              key={`desktop-${candidateRound}`}
+              key={`desktop-level-${levelNumber}`}
               label={String(levelNumber)}
-              active={candidateRound === roundName}
+              active={levelNumber === 2}
               locked={locked}
-              onClick={() => handleRoundChange(candidateRound)}
+              onClick={() => navigateToLevel(levelNumber as 1 | 2)}
             />
           );
         })}
@@ -4736,16 +4758,15 @@ function PackItLevelTwoScreen() {
                       visibility: isDesktopLayout ? "hidden" : "visible",
                     }}
                   >
-                    {ROUND_SEQUENCE.map((candidateRound, index) => {
-                      const levelNumber = index + 1;
-                      const locked = levelNumber > currentRoundLevel;
+                    {[1, 2, 3].map((levelNumber) => {
+                      const locked = levelNumber === 3;
                       return (
                         <MobileLevelButton
-                          key={candidateRound}
+                          key={`mobile-level-${levelNumber}`}
                           label={String(levelNumber)}
-                          active={candidateRound === roundName}
+                          active={levelNumber === 2}
                           locked={locked}
-                          onClick={() => handleRoundChange(candidateRound)}
+                          onClick={() => navigateToLevel(levelNumber as 1 | 2)}
                         />
                       );
                     })}
@@ -5662,6 +5683,20 @@ function PackItLevelTwoScreen() {
 // the upcoming L2 wiring. On this branch the game plays the new L1
 // tube-replicator mechanic implemented in PackItLevelOneScreen.
 export default function PackItScreen() {
-  return <PackItLevelOneScreen />;
+  const [level, setLevel] = useState(readLevelFromUrl);
+
+  useEffect(() => {
+    const syncLevelFromUrl = () => {
+      setLevel(readLevelFromUrl());
+    };
+
+    syncLevelFromUrl();
+    window.addEventListener("popstate", syncLevelFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncLevelFromUrl);
+    };
+  }, []);
+
+  return level === 2 ? <PackItLevelTwoScreen /> : <PackItLevelOneScreen />;
 }
 void PackItLevelTwoScreen;

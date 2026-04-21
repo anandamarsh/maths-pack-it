@@ -10,10 +10,6 @@ import type {
 
 type DynamicQuestionLocale = "en" | "hi" | "zh";
 
-// TODO(L1): Hindi/Chinese question text templates are not yet localised.
-// For now `getLocalizedLevelOneQuestionText` returns the English template
-// for hi/zh locales. Mirror the level-2 structure when adding translations.
-
 const MOBILE_ROUND_PROFILE: RoundGenerationProfile = {
   // Level 1 constraints: unit 3–8, groups 3–8, total ≤ 64.
   minTotalCount: 9,
@@ -60,6 +56,44 @@ const LEVEL_ONE_QUESTION_TEMPLATES = [
     `${groups} ${pair.containerPlural} are each filled with ${unit} ${pair.itemPlural}. How many ${pair.itemPlural} are there altogether?`,
 ] as const;
 
+const LOCALIZED_PAIR_TEXT: Record<
+  Exclude<DynamicQuestionLocale, "en">,
+  Record<
+    string,
+    {
+      item: string;
+      itemPlural: string;
+      container: string;
+      containerPlural: string;
+    }
+  >
+> = {
+  hi: {
+    apple: { item: "सेब", itemPlural: "सेब", container: "टोकरा", containerPlural: "टोकरियाँ" },
+    fish: { item: "मछली", itemPlural: "मछलियाँ", container: "कटोरा", containerPlural: "कटोरे" },
+    egg: { item: "अंडा", itemPlural: "अंडे", container: "कार्टन", containerPlural: "कार्टन" },
+    cookie: { item: "कुकी", itemPlural: "कुकीज़", container: "जार", containerPlural: "जार" },
+    cupcake: { item: "कपकेक", itemPlural: "कपकेक", container: "ट्रे", containerPlural: "ट्रे" },
+    gem: { item: "रत्न", itemPlural: "रत्न", container: "संदूक", containerPlural: "संदूक" },
+  },
+  zh: {
+    apple: { item: "苹果", itemPlural: "苹果", container: "板条箱", containerPlural: "板条箱" },
+    fish: { item: "鱼", itemPlural: "鱼", container: "碗", containerPlural: "碗" },
+    egg: { item: "鸡蛋", itemPlural: "鸡蛋", container: "纸盒", containerPlural: "纸盒" },
+    cookie: { item: "曲奇", itemPlural: "曲奇", container: "罐子", containerPlural: "罐子" },
+    cupcake: { item: "纸杯蛋糕", itemPlural: "纸杯蛋糕", container: "托盘", containerPlural: "托盘" },
+    gem: { item: "宝石", itemPlural: "宝石", container: "箱子", containerPlural: "箱子" },
+  },
+};
+
+function getPairText(pair: GroupingPair, locale: DynamicQuestionLocale) {
+  if (locale === "en") {
+    return pair;
+  }
+
+  return LOCALIZED_PAIR_TEXT[locale][pair.item] ?? pair;
+}
+
 function pickQuestionTemplateIndex(
   previousTemplateIndex: number | null,
   random: () => number,
@@ -96,9 +130,37 @@ export function getLocalizedLevelOneQuestionText(
   >,
   locale: string,
 ) {
-  // TODO(L1): Add Hindi / Chinese templates. For now fall back to English.
-  void locale;
-  void (null as DynamicQuestionLocale | null);
+  const normalizedLocale = (locale === "hi" || locale === "zh" ? locale : "en") as DynamicQuestionLocale;
+  const pairText = getPairText(question.pair, normalizedLocale);
+
+  if (normalizedLocale === "hi") {
+    const templates = [
+      `यदि 1 ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं, तो ${question.groupsA} ${pairText.containerPlural} में कितने ${pairText.itemPlural} होंगे?`,
+      `एक ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं। ${question.groupsA} ${pairText.containerPlural} में कितने ${pairText.itemPlural} होंगे?`,
+      `हर ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं। ${question.groupsA} ${pairText.containerPlural} में कुल कितने ${pairText.itemPlural} होंगे?`,
+      `एक ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} भरे हैं। ${question.groupsA} ${pairText.containerPlural} भरने के लिए कितने ${pairText.itemPlural} चाहिए?`,
+      `यदि एक ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं, तो ${question.groupsA} ${pairText.containerPlural} में कुल कितने ${pairText.itemPlural} होंगे?`,
+      `${question.unitRate} ${pairText.itemPlural} 1 ${pairText.container} भरते हैं। ${question.groupsA} ${pairText.containerPlural} भरने के लिए कितने ${pairText.itemPlural} चाहिए?`,
+      `एक ${pairText.container} में ठीक ${question.unitRate} ${pairText.itemPlural} आते हैं। ${question.groupsA} ${pairText.containerPlural} में कुल कितने ${pairText.itemPlural} होंगे?`,
+      `${question.groupsA} ${pairText.containerPlural} में हर एक में ${question.unitRate} ${pairText.itemPlural} हैं। कुल कितने ${pairText.itemPlural} हैं?`,
+    ];
+    return templates[question.questionTemplateIndex] ?? templates[0];
+  }
+
+  if (normalizedLocale === "zh") {
+    const templates = [
+      `如果1个${pairText.container}里有${question.unitRate}${pairText.itemPlural}，那么${question.groupsA}${pairText.containerPlural}里一共有多少${pairText.itemPlural}？`,
+      `一个${pairText.container}里有${question.unitRate}${pairText.itemPlural}。${question.groupsA}${pairText.containerPlural}里有多少${pairText.itemPlural}？`,
+      `每个${pairText.container}里有${question.unitRate}${pairText.itemPlural}。${question.groupsA}${pairText.containerPlural}里总共有多少${pairText.itemPlural}？`,
+      `一个${pairText.container}装有${question.unitRate}${pairText.itemPlural}。装满${question.groupsA}${pairText.containerPlural}需要多少${pairText.itemPlural}？`,
+      `如果一个${pairText.container}里有${question.unitRate}${pairText.itemPlural}，那么${question.groupsA}${pairText.containerPlural}里一共有多少${pairText.itemPlural}？`,
+      `${question.unitRate}${pairText.itemPlural}装满1个${pairText.container}。装满${question.groupsA}${pairText.containerPlural}需要多少${pairText.itemPlural}？`,
+      `一个${pairText.container}正好能装${question.unitRate}${pairText.itemPlural}。${question.groupsA}${pairText.containerPlural}一共能装多少${pairText.itemPlural}？`,
+      `${question.groupsA}${pairText.containerPlural}里每个都装有${question.unitRate}${pairText.itemPlural}。总共有多少${pairText.itemPlural}？`,
+    ];
+    return templates[question.questionTemplateIndex] ?? templates[0];
+  }
+
   const template =
     LEVEL_ONE_QUESTION_TEMPLATES[question.questionTemplateIndex] ??
     LEVEL_ONE_QUESTION_TEMPLATES[0];
@@ -109,9 +171,23 @@ export function getLocalizedLevelOneBlackboardSteps(
   question: Pick<PackQuestion, "pair" | "totalA" | "groupsA" | "unitRate">,
   locale: string,
 ) {
-  // TODO(L1): Add Hindi / Chinese blackboard steps. For now fall back to English.
-  void locale;
-  void (null as DynamicQuestionLocale | null);
+  const normalizedLocale = (locale === "hi" || locale === "zh" ? locale : "en") as DynamicQuestionLocale;
+  const pairText = getPairText(question.pair, normalizedLocale);
+
+  if (normalizedLocale === "hi") {
+    return [
+      `1 ${pairText.container} = ${question.unitRate} ${pairText.itemPlural}.`,
+      `${question.groupsA} ${pairText.containerPlural} = ${question.groupsA} × ${question.unitRate} = ${question.totalA} ${pairText.itemPlural}.`,
+    ];
+  }
+
+  if (normalizedLocale === "zh") {
+    return [
+      `1个${pairText.container} = ${question.unitRate}${pairText.itemPlural}。`,
+      `${question.groupsA}${pairText.containerPlural} = ${question.groupsA} × ${question.unitRate} = ${question.totalA}${pairText.itemPlural}。`,
+    ];
+  }
+
   return buildLevelOneBlackboardSteps(
     question.pair,
     question.totalA,
