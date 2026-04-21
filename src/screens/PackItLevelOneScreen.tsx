@@ -40,8 +40,19 @@ import type { PhantomPos } from "../hooks/useAutopilot";
 
 const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
 const ROUND_SEQUENCE: RoundName[] = ["load", "pack", "ship"];
-const QUESTIONS_PER_ROUND = 10;
+const AUTOPILOT_QUESTION_COUNT = 5;
 const DESKTOP_RIGHT_RAIL_WIDTH_PX = 17 * 16;
+const AUTOPILOT_QUERY_PARAM = "autopilot";
+const LEVEL_CHANGE_EVENT = "pack-it:set-level";
+
+function getRoundAutopilotMistakeIndexes(round: RoundName, total: number) {
+  const templates: Record<RoundName, number[]> = {
+    load: [1, 6],
+    pack: [2],
+    ship: [3, 7],
+  };
+  return templates[round].filter((index) => index < total);
+}
 
 const L1_QUESTION_KEYWORDS = ["one", "a", "an", "each", "every", "per"];
 
@@ -1060,11 +1071,13 @@ function L1ProgressBar({
   target,
   onOvershoot,
   forceRed = false,
+  showLabel = true,
 }: {
   current: number;
   target: number;
   onOvershoot: () => void;
   forceRed?: boolean;
+  showLabel?: boolean;
 }) {
   const ratio = target === 0 ? 0 : current / target;
   const isDanger = forceRed || ratio > 1;
@@ -1113,24 +1126,26 @@ function L1ProgressBar({
       }}
     >
       <div style={filledStyle} />
-      <div
-        data-capture-ignore="true"
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#e2e8f0",
-          fontSize: 11,
-          fontWeight: 900,
-          letterSpacing: "0.08em",
-          textShadow: "0 1px 2px rgba(0,0,0,0.7)",
-        }}
-      >
-        {current}/{target}
-      </div>
+      {showLabel ? (
+        <div
+          data-capture-ignore="true"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#e2e8f0",
+            fontSize: 11,
+            fontWeight: 900,
+            letterSpacing: "0.08em",
+            textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+          }}
+        >
+          {current}/{target}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1429,6 +1444,7 @@ export default function PackItLevelOneScreen() {
   const [flash, setFlash] = useState<FlashFeedback>(null);
   const [revealCtaMode, setRevealCtaMode] = useState<RevealCtaMode>(null);
   const [forceAnswerBanner, setForceAnswerBanner] = useState(false);
+  const [isContinuousAutopilot, setIsContinuousAutopilot] = useState(false);
   const [isQuestionDemo, setIsQuestionDemo] = useState(false);
   const [phantomPos, setPhantomPos] = useState<PhantomPos | null>(null);
   const pointsDeductedRef = useRef(false);
@@ -1440,10 +1456,21 @@ export default function PackItLevelOneScreen() {
   const questionTypeIntervalRef = useRef<number | null>(null);
   const captureFlashTimerRef = useRef<number | null>(null);
   const autopilotTimerRefs = useRef<number[]>([]);
+  const autopilotAdvanceTimerRef = useRef<number | null>(null);
+  const continuousAutopilotStartTimerRef = useRef<number | null>(null);
   const cheatBufferRef = useRef("");
+  const autopilotMistakeIndexesRef = useRef<number[]>([]);
+  const autopilotMistakenQuestionsRef = useRef<Set<number>>(new Set());
+  const nextQuestionButtonRef = useRef<HTMLButtonElement | null>(null);
+  const roundCompleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const snipDragRef = useRef<SnipDragState | null>(null);
   const musicStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("pack-it:full-autopilot");
+  }, []);
 
   const question: PackQuestion = round.questions[questionIndex];
 
@@ -1484,10 +1511,13 @@ export default function PackItLevelOneScreen() {
       glow: "0 0 18px rgba(244,114,182,0.24)",
     },
   };
+  const progressQuestionTotal = isContinuousAutopilot
+    ? AUTOPILOT_QUESTION_COUNT
+    : round.questions.length;
   const completedQuestionCount = isRoundComplete
-    ? round.questions.length
+    ? progressQuestionTotal
     : Math.min(
-        round.questions.length,
+        progressQuestionTotal,
         questionIndex + (phase === "correct" || showNextButton ? 1 : 0),
       );
   const visibleApplesEarned =
@@ -1498,8 +1528,7 @@ export default function PackItLevelOneScreen() {
   const tubesDisabled =
     isShipLocked ||
     phase === "correct" ||
-    phase === "shipAnimating" ||
-    isQuestionDemo;
+    phase === "shipAnimating";
   const questionResetKey = `${locale}-${roundName}-${questionIndex}`;
 
   const clearAutopilotTimers = useCallback(() => {
@@ -1507,6 +1536,14 @@ export default function PackItLevelOneScreen() {
       window.clearTimeout(timerId);
     });
     autopilotTimerRefs.current = [];
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+      autopilotAdvanceTimerRef.current = null;
+    }
+    if (continuousAutopilotStartTimerRef.current !== null) {
+      window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      continuousAutopilotStartTimerRef.current = null;
+    }
   }, []);
 
   const resetQuestionState = useCallback(() => {
@@ -1550,6 +1587,14 @@ export default function PackItLevelOneScreen() {
   useEffect(() => {
     robotSolvedQuestionRef.current = false;
   }, [questionIndex, roundName]);
+
+  useEffect(() => {
+    autopilotMistakeIndexesRef.current = getRoundAutopilotMistakeIndexes(
+      roundName,
+      round.questions.length,
+    );
+    autopilotMistakenQuestionsRef.current = new Set();
+  }, [round.questions.length, roundName]);
 
   useEffect(() => {
     setDevPassedQuestionIndex(null);
@@ -1787,6 +1832,15 @@ export default function PackItLevelOneScreen() {
       } else {
         nextButtonTimerRef.current = window.setTimeout(
           () => {
+            if (
+              nextMode === "next" &&
+              isContinuousAutopilot &&
+              completedQuestionCount >= AUTOPILOT_QUESTION_COUNT
+            ) {
+              setIsRoundComplete(true);
+              playLevelComplete();
+              return;
+            }
             setRevealCtaMode(nextMode);
             setShowNextButton(true);
           },
@@ -1914,7 +1968,7 @@ export default function PackItLevelOneScreen() {
     }, 1200);
   }
 
-  function handleRobotSolvedQuestion() {
+  function handleRobotSolvedQuestion(nextMode: RevealCtaMode = "retry") {
     beginMusic();
     robotSolvedQuestionRef.current = true;
     setCalculatorInput(String(question.answer));
@@ -1922,10 +1976,19 @@ export default function PackItLevelOneScreen() {
       setShipCommitted(true);
       setSubmittedShipTotal(question.answer);
     }
-    onCorrect("retry");
+    onCorrect(nextMode);
   }
 
   function advanceQuestion() {
+    if (
+      isContinuousAutopilot &&
+      completedQuestionCount >= AUTOPILOT_QUESTION_COUNT
+    ) {
+      setIsRoundComplete(true);
+      playLevelComplete();
+      return;
+    }
+
     if (questionIndex < round.questions.length - 1) {
       const nextIndex = questionIndex + 1;
       setQuestionIndex(nextIndex);
@@ -1951,20 +2014,26 @@ export default function PackItLevelOneScreen() {
     setQuestionIndex(passedIndex + 1);
   }
 
-  function navigateToLevel(level: 1 | 2) {
+  function navigateToLevel(level: 1 | 2, options?: { autopilot?: boolean }) {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
-    if (level === 1) {
-      url.searchParams.delete("level");
+    url.searchParams.delete("level");
+    if (options?.autopilot) {
+      url.searchParams.set(AUTOPILOT_QUERY_PARAM, "1");
     } else {
-      url.searchParams.set("level", String(level));
+      url.searchParams.delete(AUTOPILOT_QUERY_PARAM);
     }
-    window.history.pushState({}, "", url.toString());
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.history.replaceState({}, "", url.toString());
+    window.dispatchEvent(
+      new CustomEvent(LEVEL_CHANGE_EVENT, {
+        detail: { level },
+      }),
+    );
   }
 
   function handleRefreshCurrentQuestion() {
     setFlash(null);
+    setIsContinuousAutopilot(false);
     resetQuestionState();
   }
 
@@ -1972,18 +2041,37 @@ export default function PackItLevelOneScreen() {
     handleRefreshCurrentQuestion();
   }
 
-  function handleRoundCompleteContinue() {
-    if (nextRoundName) {
+  const handleRoundCompleteContinue = useCallback(() => {
+    const currentRoundIndex = ROUND_SEQUENCE.indexOf(roundName);
+    const upcomingRound = ROUND_SEQUENCE[currentRoundIndex + 1] ?? null;
+
+    if (upcomingRound) {
       setIsRoundComplete(false);
-      setRoundName(nextRoundName);
-      setRound(makeRound(1, nextRoundName, isMobile));
+      setRoundName(upcomingRound);
+      setRound(makeRound(1, upcomingRound, isMobile));
       setQuestionIndex(0);
       setScore(0);
       return;
     }
 
-    navigateToLevel(2);
-  }
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("level");
+    if (isContinuousAutopilot) {
+      url.searchParams.set(AUTOPILOT_QUERY_PARAM, "1");
+    } else {
+      url.searchParams.delete(AUTOPILOT_QUERY_PARAM);
+    }
+    window.history.replaceState({}, "", url.toString());
+    window.dispatchEvent(
+      new CustomEvent(LEVEL_CHANGE_EVENT, {
+        detail: { level: 2 },
+      }),
+    );
+  }, [isContinuousAutopilot, isMobile, roundName]);
 
   function handleToggleMute() {
     const next = toggleMute();
@@ -2143,6 +2231,7 @@ export default function PackItLevelOneScreen() {
     ROUND_SEQUENCE[ROUND_SEQUENCE.indexOf(roundName) + 1] ?? null;
   const finalRoundCtaLabel = `${t("game.nextRound")}: Level 2`;
   const visibleQuestionText = questionText.slice(0, typedQuestionLength);
+  const isQuestionTypingComplete = typedQuestionLength >= questionText.length;
   const calculatorTopBanner = showAnswerBanner ? (
     <span className="font-black tracking-[0.06em]">
       <span className="text-white">{t("game.answerLabel")}</span>{" "}
@@ -2194,7 +2283,7 @@ export default function PackItLevelOneScreen() {
     autopilotTimerRefs.current.push(timerId);
   }
 
-  function solveCurrentQuestion() {
+  function solveCurrentQuestion(mode: "retry" | "solve" = "retry") {
     if (showNextButton || isRoundComplete || phase !== "playing") {
       return;
     }
@@ -2203,21 +2292,38 @@ export default function PackItLevelOneScreen() {
     setForceAnswerBanner(false);
     setIsQuestionDemo(true);
     setPhantomPos(null);
+    setCalculatorInput("0");
 
     const MOVE_MS = 280;
     const PRESS_MS = 120;
     const SETTLE_MS = 220;
-    let timelineMs = 0;
+    const RESET_SETTLE_MS = 220;
+    let timelineMs = RESET_SETTLE_MS;
+    const shouldIntentionallyMiss =
+      mode === "solve" &&
+      isContinuousAutopilot &&
+      autopilotMistakeIndexesRef.current.includes(questionIndex) &&
+      !autopilotMistakenQuestionsRef.current.has(questionIndex);
+
+    const targetAnswer = shouldIntentionallyMiss
+      ? roundName === "load"
+        ? Math.max(0, question.answer - question.unitRate)
+        : question.answer + 1
+      : question.answer;
 
     if (roundName === "load") {
       const targetCount = Math.max(
-        1,
-        Math.round(question.answer / Math.max(1, question.unitRate)),
+        0,
+        Math.round(targetAnswer / Math.max(1, question.unitRate)),
       );
-      const currentCount = Math.max(1, displayedTubeCounts.length);
+      // The cheat digits may still be reflected in the current render when
+      // automation starts, but the solver always resets Level 1 load to zero
+      // before moving the phantom hand.
+      const currentCount = 0;
       const action =
         targetCount >= currentCount ? ("plus" as const) : ("minus" as const);
       const pressCount = Math.abs(targetCount - currentCount);
+      let autopilotLoadTotal = 0;
 
       for (let index = 0; index < pressCount; index += 1) {
         const buttonCenter = getTubeAdjustButtonCenter(action);
@@ -2244,31 +2350,29 @@ export default function PackItLevelOneScreen() {
         scheduleAutopilotStep(() => {
           if (action === "plus") {
             playDragStep();
-            setCalculatorInput((current) => {
-              const parsed = Number.parseInt(current, 10);
-              const currentValue = Number.isNaN(parsed) ? 0 : parsed;
-              return String(currentValue + question.unitRate);
-            });
+            autopilotLoadTotal += question.unitRate;
+            setCalculatorInput(String(autopilotLoadTotal));
             return;
           }
 
           playRipple(320);
-          setCalculatorInput((current) => {
-            const parsed = Number.parseInt(current, 10);
-            const currentValue = Number.isNaN(parsed) ? 0 : parsed;
-            const fills = getTubeFillCounts(currentValue, question.unitRate);
-            if (fills.length <= 1) {
-              return current;
-            }
-            return String(Math.max(0, currentValue - fills[fills.length - 1]));
-          });
+          const fills = getTubeFillCounts(autopilotLoadTotal, question.unitRate);
+          if (fills.length <= 1) {
+            setCalculatorInput(String(autopilotLoadTotal));
+            return;
+          }
+          autopilotLoadTotal = Math.max(
+            0,
+            autopilotLoadTotal - fills[fills.length - 1],
+          );
+          setCalculatorInput(String(autopilotLoadTotal));
         }, timelineMs + MOVE_MS + PRESS_MS);
 
         timelineMs += MOVE_MS + PRESS_MS + SETTLE_MS;
       }
     } else {
       setCalculatorInput("0");
-      const answerDigits = String(question.answer).split("");
+      const answerDigits = String(targetAnswer).split("");
       let autopilotDisplayValue = "0";
 
       answerDigits.forEach((digit) => {
@@ -2331,7 +2435,12 @@ export default function PackItLevelOneScreen() {
     }, timelineMs + MOVE_MS);
 
     scheduleAutopilotStep(() => {
-      handleRobotSolvedQuestion();
+      if (shouldIntentionallyMiss) {
+        autopilotMistakenQuestionsRef.current.add(questionIndex);
+        handleSubmit("next");
+        return;
+      }
+      handleRobotSolvedQuestion(mode === "solve" ? "next" : "retry");
     }, timelineMs + MOVE_MS + PRESS_MS);
 
     scheduleAutopilotStep(() => {
@@ -2342,14 +2451,7 @@ export default function PackItLevelOneScreen() {
 
   useEffect(() => {
     function handleCheatCodes(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const tagName = target?.tagName?.toLowerCase();
-      if (
-        tagName === "input" ||
-        tagName === "textarea" ||
-        target?.isContentEditable ||
-        !/^\d$/.test(event.key)
-      ) {
+      if (!/^\d$/.test(event.key)) {
         return;
       }
 
@@ -2365,13 +2467,17 @@ export default function PackItLevelOneScreen() {
 
       if (cheatBufferRef.current === "198081") {
         cheatBufferRef.current = "";
-        solveCurrentQuestion();
+        setIsContinuousAutopilot(true);
+        setCalculatorInput("0");
+        if (!showNextButton && !isRoundComplete && phase === "playing") {
+          solveCurrentQuestion("solve");
+        }
       }
     }
 
-    window.addEventListener("keydown", handleCheatCodes);
+    window.addEventListener("keydown", handleCheatCodes, true);
     return () => {
-      window.removeEventListener("keydown", handleCheatCodes);
+      window.removeEventListener("keydown", handleCheatCodes, true);
     };
   }, [
     clearAutopilotTimers,
@@ -2381,6 +2487,128 @@ export default function PackItLevelOneScreen() {
     question.answer,
     question.unitRate,
     roundName,
+    showNextButton,
+  ]);
+
+  useEffect(() => {
+    if (!isRoundComplete || !isContinuousAutopilot) {
+      return;
+    }
+
+    if (autopilotAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autopilotAdvanceTimerRef.current);
+    }
+
+    autopilotAdvanceTimerRef.current = window.setTimeout(() => {
+      autopilotAdvanceTimerRef.current = null;
+      const nextButtonCenter = getScreenCenter(roundCompleteButtonRef.current);
+      if (nextButtonCenter) {
+        setPhantomPos({
+          ...nextButtonCenter,
+          isClicking: false,
+          durationMs: 220,
+        });
+      }
+      const pressTimerId = window.setTimeout(() => {
+        if (nextButtonCenter) {
+          setPhantomPos({
+            ...nextButtonCenter,
+            isClicking: true,
+            durationMs: 120,
+          });
+        }
+        const continueTimerId = window.setTimeout(() => {
+          setPhantomPos(null);
+          handleRoundCompleteContinue();
+        }, 1000);
+        autopilotTimerRefs.current.push(continueTimerId);
+      }, 320);
+      autopilotTimerRefs.current.push(pressTimerId);
+    }, 1100);
+
+    return () => {
+      if (autopilotAdvanceTimerRef.current !== null) {
+        window.clearTimeout(autopilotAdvanceTimerRef.current);
+        autopilotAdvanceTimerRef.current = null;
+      }
+    };
+  }, [
+    handleRoundCompleteContinue,
+    isContinuousAutopilot,
+    isRoundComplete,
+  ]);
+
+  useEffect(() => {
+    if (!isContinuousAutopilot) {
+      return;
+    }
+
+    if (isRoundComplete) {
+      return;
+    }
+
+    if (phase === "correct" && showNextButton && revealCtaMode === "next") {
+      if (autopilotAdvanceTimerRef.current !== null) {
+        window.clearTimeout(autopilotAdvanceTimerRef.current);
+      }
+      autopilotAdvanceTimerRef.current = window.setTimeout(() => {
+        autopilotAdvanceTimerRef.current = null;
+        const nextCenter = getScreenCenter(nextQuestionButtonRef.current);
+        if (nextCenter) {
+          setPhantomPos({
+            ...nextCenter,
+            isClicking: false,
+            durationMs: 220,
+          });
+        }
+        const pressTimerId = window.setTimeout(() => {
+          if (nextCenter) {
+            setPhantomPos({
+              ...nextCenter,
+              isClicking: true,
+              durationMs: 120,
+            });
+          }
+          const continueTimerId = window.setTimeout(() => {
+            setPhantomPos(null);
+            advanceQuestion();
+          }, 1000);
+          autopilotTimerRefs.current.push(continueTimerId);
+        }, 220);
+        autopilotTimerRefs.current.push(pressTimerId);
+      }, 1000);
+      return;
+    }
+
+    if (
+      !showNextButton &&
+      !isQuestionDemo &&
+      phase === "playing" &&
+      isQuestionTypingComplete
+    ) {
+      if (continuousAutopilotStartTimerRef.current !== null) {
+        window.clearTimeout(continuousAutopilotStartTimerRef.current);
+      }
+      continuousAutopilotStartTimerRef.current = window.setTimeout(() => {
+        continuousAutopilotStartTimerRef.current = null;
+        solveCurrentQuestion("solve");
+      }, 0);
+    }
+
+    return () => {
+      if (autopilotAdvanceTimerRef.current !== null) {
+        window.clearTimeout(autopilotAdvanceTimerRef.current);
+        autopilotAdvanceTimerRef.current = null;
+      }
+    };
+  }, [
+    isContinuousAutopilot,
+    isQuestionDemo,
+    isQuestionTypingComplete,
+    isRoundComplete,
+    phase,
+    questionIndex,
+    revealCtaMode,
     showNextButton,
   ]);
 
@@ -2495,6 +2723,7 @@ export default function PackItLevelOneScreen() {
           </div>
           {showBoxCornerCta ? (
             <button
+              data-l1-next-question="true"
               type="button"
               onClick={ctaAction}
               className={`arcade-button absolute right-2 z-[2] inline-flex items-center rounded-full font-arcade font-bold leading-none text-white transition-all duration-150 ${
@@ -2534,7 +2763,7 @@ export default function PackItLevelOneScreen() {
         })}
       </div>
       <div className="grid grid-cols-5 gap-x-2 gap-y-3 justify-items-center">
-        {Array.from({ length: QUESTIONS_PER_ROUND }, (_, index) => (
+        {Array.from({ length: progressQuestionTotal }, (_, index) => (
           <button
             type="button"
             key={index}
@@ -2645,7 +2874,7 @@ export default function PackItLevelOneScreen() {
                 visibility: isDesktopLayout ? "hidden" : "visible",
               }}
             >
-              {Array.from({ length: QUESTIONS_PER_ROUND }, (_, index) => (
+              {Array.from({ length: progressQuestionTotal }, (_, index) => (
                 <span
                   key={index}
                   className="inline-flex h-6 w-6 items-center justify-center"
@@ -2693,6 +2922,8 @@ export default function PackItLevelOneScreen() {
             ))}
             {showNextButton ? (
               <button
+                ref={nextQuestionButtonRef}
+                data-l1-next-question="true"
                 type="button"
                 onClick={
                   revealCtaMode === "retry" ? handleTryAgain : advanceQuestion
@@ -2858,6 +3089,7 @@ export default function PackItLevelOneScreen() {
             target={question.answer}
             onOvershoot={handleOvershoot}
             forceRed={displayOverflow}
+            showLabel={roundName === "load"}
           />
           {showTubeControls ? (
             <button
@@ -2961,7 +3193,7 @@ export default function PackItLevelOneScreen() {
                   fontWeight: 700,
                 }}
               >
-                Completed: {round.questions.length}/{round.questions.length}
+                Completed: {progressQuestionTotal}/{progressQuestionTotal}
               </div>
               <div
                 style={{
@@ -2974,6 +3206,7 @@ export default function PackItLevelOneScreen() {
                 Score: {score}
               </div>
               <button
+                ref={roundCompleteButtonRef}
                 type="button"
                 onClick={handleRoundCompleteContinue}
                 style={{
