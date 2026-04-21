@@ -966,7 +966,7 @@ function getSceneBackdropBaseBackground(item: string, _palette: string) {
 
 const DESKTOP_TUBE_MIN_CAPACITY = 6;
 const DESKTOP_TUBE_MAX_CAPACITY = 10;
-const MOBILE_VISIBLE_TUBE_CAPACITY = 5;
+const MOBILE_VISIBLE_TUBE_CAPACITY = 4;
 
 type SquareSnip = {
   x: number;
@@ -1160,6 +1160,7 @@ function TestTube({
   tubeHeight,
   itemSize,
   tubeWidth,
+  showReadout,
   ariaLabel,
 }: {
   filledCount: number;
@@ -1171,6 +1172,7 @@ function TestTube({
   tubeHeight: number;
   itemSize: number;
   tubeWidth: number;
+  showReadout: boolean;
   ariaLabel: string;
 }) {
   const items = Array.from({ length: Math.max(0, filledCount) }, (_, i) => i);
@@ -1180,6 +1182,10 @@ function TestTube({
   const stackGapPx = 8;
   const stackStepPx = itemSize + stackGapPx;
   const innerMinHeightPx = itemSize + Math.max(0, capacity - 1) * stackStepPx;
+  const stackAreaHeightPx = Math.max(
+    innerMinHeightPx,
+    tubeHeight - paddingY * 2,
+  );
 
   return (
     <div
@@ -1310,7 +1316,7 @@ function TestTube({
         <div
           style={{
             position: "relative",
-            minHeight: `${innerMinHeightPx}px`,
+            minHeight: `${stackAreaHeightPx}px`,
             width: "100%",
           }}
         >
@@ -1333,16 +1339,20 @@ function TestTube({
           ))}
         </div>
       </div>
-      <div
-        aria-hidden="true"
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginTop: 26,
-        }}
-      >
-        <DigitalReadout value={filledCount} compact />
-      </div>
+      {showReadout ? (
+        <div
+          aria-hidden="true"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginTop: 26,
+            position: "relative",
+            zIndex: 12,
+          }}
+        >
+          <DigitalReadout value={filledCount} compact />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1527,7 +1537,7 @@ export default function PackItLevelOneScreen() {
   const isShipLocked = roundName === "ship" && !shipCommitted;
   const tubesDisabled =
     isShipLocked ||
-    phase === "correct" ||
+    (!isMobileLandscape && phase === "correct") ||
     phase === "shipAnimating";
   const questionResetKey = `${locale}-${roundName}-${questionIndex}`;
 
@@ -2181,7 +2191,8 @@ export default function PackItLevelOneScreen() {
     [question.pair.item, question.pair.palette],
   );
   const showDevChrome = import.meta.env.DEV;
-  const showAnswerBanner = import.meta.env.DEV || forceAnswerBanner;
+  const showAnswerBanner =
+    (!isMobileLandscape && import.meta.env.DEV) || forceAnswerBanner;
   const itemSize = isMobile ? 32 : 48;
   const paddingX = Math.max(10, Math.round(itemSize * 0.25));
   const paddingY = Math.max(4, Math.round(itemSize * 0.08));
@@ -2198,7 +2209,7 @@ export default function PackItLevelOneScreen() {
   const innerHeight =
     itemSize + Math.max(0, visibleTubeCapacity - 1) * stackStepPx;
   const tubeHeight = isMobileLandscape
-    ? 208
+    ? innerHeight + paddingY * 2 + stackLiftPx
     : innerHeight + paddingY * 2 + stackLiftPx;
   const tubeGap = isMobileLandscape ? 10 : 18;
   const maxTubeCount = getTubeStripCapacityForViewportWidth(
@@ -2227,6 +2238,7 @@ export default function PackItLevelOneScreen() {
   const showTubeErrorTint =
     displayOverflow || currentProgressTotal > question.answer;
   const showTubeControls = roundName === "load" && phase === "playing";
+  const isMobileLandscapeControlDock = isMobileLandscape;
   const nextRoundName =
     ROUND_SEQUENCE[ROUND_SEQUENCE.indexOf(roundName) + 1] ?? null;
   const finalRoundCtaLabel = `${t("game.nextRound")}: Level 2`;
@@ -2630,7 +2642,7 @@ export default function PackItLevelOneScreen() {
         ? "calc(4.5rem + 2px)"
         : "calc(4.5rem - 4px)"
       : isMobileLandscape
-        ? "calc(100% + 4px)"
+        ? "calc(100% - 12px)"
         : isDesktopExpanded
           ? "calc(100% - 0.4rem)"
           : undefined;
@@ -2639,7 +2651,7 @@ export default function PackItLevelOneScreen() {
         ? "calc(4.5rem + 2px)"
         : "calc(4.5rem - 4px)"
       : isMobileLandscape
-        ? "calc(100% + 4px)"
+        ? "calc(100% - 12px)"
         : isDesktopExpanded
           ? "calc(100% - 0.4rem)"
           : "10.5rem";
@@ -2654,6 +2666,8 @@ export default function PackItLevelOneScreen() {
           transform:
             isMobileLandscape && calculatorMinimized
               ? "translateY(2px)"
+              : isMobileLandscape
+                ? "translateY(10px)"
               : undefined,
           transition: `height ${DOCK_TRANSITION}, min-height ${DOCK_TRANSITION}`,
         }}
@@ -2806,6 +2820,12 @@ export default function PackItLevelOneScreen() {
       desktopRailTop={desktopRailTop}
       mobileMinimizeResetKey={`${roundName}-${questionIndex}`}
     >
+      {({ calculatorMinimized }) => {
+        const hideSceneForExpandedMobileKeypad =
+          isMobileLandscape && !calculatorMinimized;
+
+        return (
+      <>
       <div
         ref={rootRef}
         style={{
@@ -2875,18 +2895,27 @@ export default function PackItLevelOneScreen() {
               }}
             >
               {Array.from({ length: progressQuestionTotal }, (_, index) => (
-                <span
+                <button
+                  type="button"
                   key={index}
                   className="inline-flex h-6 w-6 items-center justify-center"
+                  onClick={() => handleDevAppleClick(index)}
+                  disabled={!isLocalDev}
+                  style={{
+                    cursor: isLocalDev ? "pointer" : "default",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                  }}
                 >
                   <ProgressApple active={index < visibleApplesEarned} />
-                </span>
+                </button>
               ))}
             </div>
           </div>
         </div>
 
-        {phase === "correct" ? (
+        {phase === "correct" && isDesktopLayout ? (
           <div
             style={{
               position: "absolute",
@@ -2964,9 +2993,11 @@ export default function PackItLevelOneScreen() {
             justifyContent: "flex-start",
             alignItems: "center",
             transform: isMobileLandscape
-              ? "translateY(0.5rem)"
+              ? "translateY(1.3rem)"
               : "translateY(1rem)",
             overflow: "hidden",
+            visibility: hideSceneForExpandedMobileKeypad ? "hidden" : "visible",
+            pointerEvents: hideSceneForExpandedMobileKeypad ? "none" : "auto",
           }}
         >
           <div
@@ -2997,9 +3028,10 @@ export default function PackItLevelOneScreen() {
                   tubeHeight={tubeHeight}
                   itemSize={itemSize}
                   tubeWidth={containerWidth}
+                  showReadout={!isMobile}
                   ariaLabel={`${idx === 0 ? "Starter" : "Replicated"} tube with ${filledCount} ${question.pair.itemPlural}`}
                 />
-                {idx < displayedTubeCounts.length - 1 ? (
+                {idx < displayedTubeCounts.length - 1 && !isMobile ? (
                   <span
                     aria-hidden="true"
                     style={{
@@ -3007,6 +3039,7 @@ export default function PackItLevelOneScreen() {
                       left: `calc(100% + ${tubeGap / 2}px)`,
                       bottom: 0,
                       transform: "translate(-50%, -12%)",
+                      zIndex: 12,
                       fontFamily: "'DSEG7Classic', 'Courier New', monospace",
                       fontSize: "1.35rem",
                       fontWeight: 800,
@@ -3027,12 +3060,17 @@ export default function PackItLevelOneScreen() {
 
         <div
           style={{
-            display: "flex",
+            display: !isMobileLandscape || phase === "playing" ? "flex" : "none",
             alignItems: "center",
             justifyContent: "center",
             gap: 16,
-            position: "relative",
-            zIndex: 6,
+            position: isMobileLandscapeControlDock ? "absolute" : "relative",
+            left: isMobileLandscapeControlDock ? "50%" : undefined,
+            bottom: isMobileLandscapeControlDock ? "0.45rem" : undefined,
+            transform: isMobileLandscapeControlDock
+              ? "translateX(-50%)"
+              : undefined,
+            zIndex: isMobileLandscapeControlDock ? 10 : 6,
             isolation: "isolate",
             width: "100%",
             maxWidth: `${barRowWidth}px`,
@@ -3040,7 +3078,9 @@ export default function PackItLevelOneScreen() {
             minHeight: "4.25rem",
             paddingInline: 8,
             boxSizing: "border-box",
-            marginBottom: isMobileLandscape ? "0.35rem" : "1.1rem",
+            marginBottom: isMobileLandscape ? "0" : "1.1rem",
+            visibility: hideSceneForExpandedMobileKeypad ? "hidden" : "visible",
+            pointerEvents: hideSceneForExpandedMobileKeypad ? "none" : "auto",
           }}
         >
           {showTubeControls ? (
@@ -3139,7 +3179,7 @@ export default function PackItLevelOneScreen() {
             role="dialog"
             aria-modal="true"
             style={{
-              position: "absolute",
+              position: "fixed",
               inset: 0,
               background:
                 "radial-gradient(ellipse at center, rgba(15,23,42,0.985) 0%, rgba(2,6,23,0.995) 78%)",
@@ -3147,7 +3187,7 @@ export default function PackItLevelOneScreen() {
               alignItems: "center",
               justifyContent: "center",
               padding: 24,
-              zIndex: 20,
+              zIndex: 10000,
             }}
           >
             <div
@@ -3389,6 +3429,9 @@ export default function PackItLevelOneScreen() {
           </div>,
           document.body,
         )}
+      </>
+        );
+      }}
     </GameLayout>
   );
 }

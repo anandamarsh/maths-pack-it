@@ -5683,7 +5683,7 @@ function PackItLevelTwoScreen() {
       )}
       {isRoundComplete && (
         <div
-          className="absolute inset-0 z-[130] flex items-center justify-center p-6"
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-6"
           style={{
             background:
               "radial-gradient(ellipse at center, rgba(15,23,42,0.985) 0%, rgba(2,6,23,0.995) 78%)",
