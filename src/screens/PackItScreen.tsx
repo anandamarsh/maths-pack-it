@@ -4,13 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import PhantomHand from "../components/PhantomHand";
 import GameLayout from "../components/GameLayout";
+import PackItLevelOneScreen from "./PackItLevelOneScreen";
 import { makeRound } from "../game/packItGame";
 import type { PackQuestion, RoundName } from "../calculations/types.ts";
 import {
   getLocalizedInsufficientItemsLabel,
-  getLocalizedLevelOneBlackboardSteps,
-  getLocalizedLevelOneQuestionText,
-} from "../calculations/level-1/round-1.ts";
+  getLocalizedLevelTwoBlackboardSteps,
+  getLocalizedLevelTwoQuestionText,
+} from "../calculations/level-2/round-1.ts";
 import { getDemoConfig } from "../demoMode";
 import {
   useIsCoarsePointer,
@@ -57,6 +58,7 @@ type PhantomDragState = {
   anchorItemId: number;
   x: number;
   y: number;
+  durationMs?: number;
 };
 
 type ReturnState = {
@@ -87,9 +89,73 @@ type FlashFeedback = {
 
 type RevealCtaMode = "next" | "retry" | null;
 const DOCK_TRANSITION = "320ms cubic-bezier(0.22,0.72,0.2,1)";
+const AUTOPILOT_QUERY_PARAM = "autopilot";
+const LEVEL_CHANGE_EVENT = "pack-it:set-level";
+
+function readLevelFromUrl(): 1 | 2 {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+
+  return new URLSearchParams(window.location.search).get("level") === "2"
+    ? 2
+    : 1;
+}
+
+function navigateToLevel(level: 1 | 2) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("level");
+  url.searchParams.delete(AUTOPILOT_QUERY_PARAM);
+  window.history.replaceState({}, "", url.toString());
+  window.dispatchEvent(
+    new CustomEvent(LEVEL_CHANGE_EVENT, {
+      detail: { level },
+    }),
+  );
+}
+
+function resetUrlState() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("level");
+  url.searchParams.delete(AUTOPILOT_QUERY_PARAM);
+  window.history.replaceState({}, "", url.toString());
+}
+
+function readAutopilotFromUrl() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return new URLSearchParams(window.location.search).get(AUTOPILOT_QUERY_PARAM) === "1";
+}
+
+function clearAutopilotFromUrl() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.delete(AUTOPILOT_QUERY_PARAM);
+  window.history.replaceState({}, "", url.toString());
+}
 
 const QUESTION_COUNT = 10;
 const AUTOPILOT_QUESTION_COUNT = 5;
+
+function getRoundAutopilotMistakeIndexes(round: RoundName, total: number) {
+  const templates: Record<RoundName, number[]> = {
+    load: [1, 6],
+    pack: [2],
+    ship: [3, 7],
+  };
+  return templates[round].filter((index) => index < total);
+}
 const QUESTION_KEYWORDS = [
   "pack",
   "packed",
@@ -1484,7 +1550,7 @@ async function downloadCanvasPng(canvas: HTMLCanvasElement, fileName: string) {
   });
 }
 
-export default function PackItScreen() {
+function PackItLevelTwoScreen() {
   const demoConfig = useMemo(() => getDemoConfig(), []);
   const { locale } = useLocale();
   const t = useT();
@@ -1505,7 +1571,11 @@ export default function PackItScreen() {
   const [roundName, setRoundName] = useState<RoundName>("load");
   const round = useMemo(
     () =>
-      makeRound(1, roundName, isMobile, {
+      // TODO(L1): The current playfield renders the L2 drag mechanic (former L1).
+      // The new L1 "replicate the filled test tube" mechanic is implemented in
+      // src/calculations/level-1/round-1.ts but the tube-replication UI + progress
+      // bar is not yet wired into this screen. Until then we render L2 content here.
+      makeRound(2, roundName, isMobile, {
         maxGroupCount: isMobile ? undefined : desktopGroupCapacity,
         maxUnitCount: isMobile ? undefined : desktopTubeCapacity,
       }),
@@ -1535,7 +1605,9 @@ export default function PackItScreen() {
   const [calculatorOverride, setCalculatorOverride] = useState(false);
   const [isCalculatorAdjusting, setIsCalculatorAdjusting] = useState(false);
   const [forceAnswerBanner, setForceAnswerBanner] = useState(false);
-  const [isContinuousAutopilot, setIsContinuousAutopilot] = useState(false);
+  const [isContinuousAutopilot, setIsContinuousAutopilot] = useState(() =>
+    readAutopilotFromUrl(),
+  );
   const [mobileWrongAnswerRevealKey, setMobileWrongAnswerRevealKey] =
     useState(0);
   const [snipMode, setSnipMode] = useState(false);
@@ -1588,6 +1660,8 @@ export default function PackItScreen() {
   const continuousAutopilotStartTimerRef = useRef<number | null>(null);
   const cheatBufferRef = useRef("");
   const continuousAutopilotStartIndexRef = useRef(0);
+  const autopilotMistakeIndexesRef = useRef<number[]>([]);
+  const autopilotMistakenQuestionsRef = useRef<Set<number>>(new Set());
   const dragSoundPointRef = useRef<{
     x: number;
     y: number;
@@ -1599,6 +1673,32 @@ export default function PackItScreen() {
   const packHoldIntervalRef = useRef<number | null>(null);
   const autoExpandCalculatorTimerRef = useRef<number | null>(null);
   const itemsRef = useRef<PackedItem[]>(items);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.removeItem("pack-it:full-autopilot");
+  }, []);
+
+  useEffect(() => {
+    if (!readAutopilotFromUrl()) {
+      return;
+    }
+
+    clearKeypadAdjustTimers();
+    if (displaySyncLockRef.current !== null) {
+      window.clearTimeout(displaySyncLockRef.current);
+      displaySyncLockRef.current = null;
+    }
+    setCalculatorInput("0");
+    setCalculatorOverride(false);
+    setShowInsufficientItemNotice(false);
+    setDisplayTopBoxCount(0);
+    continuousAutopilotStartIndexRef.current = questionIndex;
+    setIsContinuousAutopilot(true);
+    clearAutopilotFromUrl();
+  }, [questionIndex]);
 
   useEffect(() => {
     if (isMobile || typeof window === "undefined") {
@@ -1639,11 +1739,11 @@ export default function PackItScreen() {
   const packedItemsTotal = items.length - remainingItems.length;
   const canSubmit = !showNextQuestionButton;
   const localizedQuestionText = useMemo(
-    () => getLocalizedLevelOneQuestionText(question, locale),
+    () => getLocalizedLevelTwoQuestionText(question, locale),
     [locale, question],
   );
   const localizedBlackboardSteps = useMemo(
-    () => getLocalizedLevelOneBlackboardSteps(question, locale),
+    () => getLocalizedLevelTwoBlackboardSteps(question, locale),
     [locale, question],
   );
   const localizedInsufficientItemsText = useMemo(
@@ -1680,13 +1780,19 @@ export default function PackItScreen() {
   const progressTotal = isContinuousAutopilot
     ? AUTOPILOT_QUESTION_COUNT
     : QUESTION_COUNT;
-  const currentRoundLevel = ROUND_SEQUENCE.indexOf(roundName) + 1;
   const showDevCaptureControls = import.meta.env.DEV;
   const showAnswerBanner =
     !isQuestionDemo &&
     !isContinuousAutopilot &&
     !import.meta.env.DEV &&
     (demoConfig.showAnswers || forceAnswerBanner);
+  useEffect(() => {
+    autopilotMistakeIndexesRef.current = getRoundAutopilotMistakeIndexes(
+      roundName,
+      round.questions.length,
+    );
+    autopilotMistakenQuestionsRef.current = new Set();
+  }, [round.questions.length, roundName]);
   const chromeTheme = useMemo(
     () => getChromeTheme(question.pair.item, question.pair.palette),
     [question.pair.item, question.pair.palette],
@@ -3317,17 +3423,29 @@ export default function PackItScreen() {
           ),
     ).filter((group) => group.length > 0);
 
-    const DEMO_STEP_MS = 4080;
-    const DEMO_PICKUP_PRESS_MS = 220;
-    const DEMO_DRAG_START_DELAY_MS = 120;
-    const DEMO_DRAG_TRAVEL_MS = 920;
-    const DEMO_DROP_HOLD_MS = 300;
+    const DEMO_PICKUP_PRESS_MS = 90;
+    const DEMO_GROUP_PREVIEW_MS = 220;
+    const DEMO_DRAG_START_DELAY_MS = 0;
+    const DEMO_DRAG_TRAVEL_MS = 440;
+    const DEMO_DROP_HOLD_MS = 40;
+    const DEMO_COLUMN_DROP_FINISH_MS = 620;
+    const DEMO_NEXT_PICKUP_DELAY_MS = 300;
+    const DEMO_STEP_MS =
+      DEMO_GROUP_PREVIEW_MS +
+      DEMO_PICKUP_PRESS_MS +
+      DEMO_DRAG_START_DELAY_MS +
+      DEMO_DRAG_TRAVEL_MS +
+      DEMO_DRAG_TRAVEL_MS +
+      DEMO_DROP_HOLD_MS +
+      DEMO_COLUMN_DROP_FINISH_MS +
+      DEMO_NEXT_PICKUP_DELAY_MS;
     const DEMO_FINAL_DROP_SETTLE_MS =
       DEMO_PICKUP_PRESS_MS +
       DEMO_DRAG_START_DELAY_MS +
       DEMO_DRAG_TRAVEL_MS +
       DEMO_DRAG_TRAVEL_MS +
-      DEMO_DROP_HOLD_MS;
+      DEMO_DROP_HOLD_MS +
+      DEMO_COLUMN_DROP_FINISH_MS;
 
     comboAssignments.forEach((group, index) => {
       window.setTimeout(() => {
@@ -3344,78 +3462,85 @@ export default function PackItScreen() {
         const comboId = nextComboIdRef.current;
         nextComboIdRef.current += 1;
 
-        if (leadItemPickupPoint) {
-          setPhantomPos({
-            ...leadItemPickupPoint,
-            isClicking: true,
-            durationMs: 120,
-          });
-        }
-
         window.setTimeout(() => {
           if (leadItemPickupPoint) {
             setPhantomPos({
               ...leadItemPickupPoint,
-              isClicking: false,
-              durationMs: DEMO_DRAG_TRAVEL_MS,
+              isClicking: true,
+              durationMs: 120,
             });
+            playDragStep();
           }
 
-          if (leadItemCenter) {
-            setPhantomDragState({
-              itemIds: orderedGroup.map((entry) => entry.itemId),
-              anchorItemId,
-              x: leadItemRect
-                ? leadItemRect.left
-                : leadItemCenter.x - itemHalfPx,
-              y: leadItemRect
-                ? leadItemRect.top
-                : leadItemCenter.y - itemHalfPx,
-            });
-          }
-
-          const targetLeadPosition = getTopBoxLeadDropPosition();
           window.setTimeout(() => {
-            if (targetLeadPosition) {
+            if (leadItemPickupPoint) {
               setPhantomPos({
-                x: targetLeadPosition.x + itemHalfPx,
-                y: targetLeadPosition.y + itemHalfPx,
+                ...leadItemPickupPoint,
                 isClicking: false,
                 durationMs: DEMO_DRAG_TRAVEL_MS,
               });
-              scheduleAutopilotDragSounds(DEMO_DRAG_TRAVEL_MS);
+            }
+
+            if (leadItemCenter) {
               setPhantomDragState({
                 itemIds: orderedGroup.map((entry) => entry.itemId),
                 anchorItemId,
-                x: targetLeadPosition.x,
-                y: targetLeadPosition.y,
+                x: leadItemRect
+                  ? leadItemRect.left
+                  : leadItemCenter.x - itemHalfPx,
+                y: leadItemRect
+                  ? leadItemRect.top
+                  : leadItemCenter.y - itemHalfPx,
+                durationMs: 0,
               });
             }
+
+            const targetLeadPosition = getTopBoxLeadDropPosition();
             window.setTimeout(() => {
               if (targetLeadPosition) {
                 setPhantomPos({
                   x: targetLeadPosition.x + itemHalfPx,
                   y: targetLeadPosition.y + itemHalfPx,
-                  isClicking: true,
-                  durationMs: 120,
+                  isClicking: false,
+                  durationMs: DEMO_DRAG_TRAVEL_MS,
+                });
+                scheduleAutopilotDragSounds(DEMO_DRAG_TRAVEL_MS);
+              }
+              if (targetLeadPosition) {
+                setPhantomDragState({
+                  itemIds: orderedGroup.map((entry) => entry.itemId),
+                  anchorItemId,
+                  x: targetLeadPosition.x,
+                  y: targetLeadPosition.y,
+                  durationMs: DEMO_DRAG_TRAVEL_MS,
                 });
               }
               window.setTimeout(() => {
-                stageComboIntoTopBox(
-                  orderedGroup.map((entry) => entry.itemId),
-                  orderedGroup.map((entry) => entry.containerIndex),
-                  comboId,
-                  targetLeadPosition ?? undefined,
-                );
-                setPhantomPos(null);
-                setPhantomDragState(null);
-                setSelectedItemIds([]);
-                setGroupingAnchorItemId(null);
-                setIsGroupingPreviewAnimating(false);
-              }, DEMO_DROP_HOLD_MS);
+                if (targetLeadPosition) {
+                  setPhantomPos({
+                    x: targetLeadPosition.x + itemHalfPx,
+                    y: targetLeadPosition.y + itemHalfPx,
+                    isClicking: true,
+                    durationMs: 120,
+                  });
+                }
+                window.setTimeout(() => {
+                  stageComboIntoTopBox(
+                    orderedGroup.map((entry) => entry.itemId),
+                    orderedGroup.map((entry) => entry.containerIndex),
+                    comboId,
+                    targetLeadPosition ?? undefined,
+                  );
+                  setPhantomPos(null);
+                  setPhantomDragState(null);
+                  setSelectedItemIds([]);
+                  setGroupingAnchorItemId(null);
+                  setIsGroupingPreviewAnimating(false);
+                }, DEMO_DROP_HOLD_MS);
+              }, DEMO_DRAG_TRAVEL_MS);
             }, DEMO_DRAG_TRAVEL_MS);
-          }, DEMO_DRAG_TRAVEL_MS);
-        }, DEMO_PICKUP_PRESS_MS + DEMO_DRAG_START_DELAY_MS);
+          }, DEMO_PICKUP_PRESS_MS + DEMO_DRAG_START_DELAY_MS);
+        }, DEMO_GROUP_PREVIEW_MS);
       }, index * DEMO_STEP_MS);
     });
 
@@ -3438,7 +3563,7 @@ export default function PackItScreen() {
               durationMs: 120,
             });
           }
-          playKeyClick();
+          playDragStep();
 
           window.setTimeout(() => {
             setSelectedItemIds([]);
@@ -3460,7 +3585,7 @@ export default function PackItScreen() {
               playWrong();
             }
           }, 180);
-        }, 1000);
+        }, 120);
       },
       Math.max(
         0,
@@ -4272,6 +4397,14 @@ export default function PackItScreen() {
       return;
     }
 
+    if (
+      autopilotMistakeIndexesRef.current.includes(questionIndex) &&
+      !autopilotMistakenQuestionsRef.current.has(questionIndex)
+    ) {
+      autopilotMistakenQuestionsRef.current.add(questionIndex);
+      markQuestionPenalty();
+    }
+
     if (isRoundComplete) {
       setPhantomPos(null);
       setPhantomDragState(null);
@@ -4310,7 +4443,12 @@ export default function PackItScreen() {
       return;
     }
 
-    if (!questionSolved && !isQuestionDemo && revealCtaMode !== "retry") {
+    if (
+      !questionSolved &&
+      !isQuestionDemo &&
+      revealCtaMode !== "retry" &&
+      typedQuestionLength >= localizedQuestionText.length
+    ) {
       if (continuousAutopilotStartTimerRef.current !== null) {
         window.clearTimeout(continuousAutopilotStartTimerRef.current);
       }
@@ -4323,10 +4461,12 @@ export default function PackItScreen() {
     isContinuousAutopilot,
     isQuestionDemo,
     isRoundComplete,
+    localizedQuestionText.length,
     questionIndex,
     questionSolved,
     revealCtaMode,
     showNextQuestionButton,
+    typedQuestionLength,
   ]);
 
   useEffect(() => {
@@ -4432,7 +4572,12 @@ export default function PackItScreen() {
     setIsContinuousAutopilot(false);
     setPhantomPos(null);
     setPhantomDragState(null);
-    handleRestart();
+    resetUrlState();
+    window.dispatchEvent(
+      new CustomEvent(LEVEL_CHANGE_EVENT, {
+        detail: { level: 1 },
+      }),
+    );
   }
 
   useEffect(() => {
@@ -4633,16 +4778,15 @@ export default function PackItScreen() {
   const desktopRailTop = isDesktopLayout ? (
     <div className="flex flex-col gap-3" style={{ marginTop: "2rem" }}>
       <div className="flex items-center justify-center gap-2">
-        {ROUND_SEQUENCE.map((candidateRound, index) => {
-          const levelNumber = index + 1;
-          const locked = levelNumber > currentRoundLevel;
+        {[1, 2, 3].map((levelNumber) => {
+          const locked = levelNumber === 3;
           return (
             <MobileLevelButton
-              key={`desktop-${candidateRound}`}
+              key={`desktop-level-${levelNumber}`}
               label={String(levelNumber)}
-              active={candidateRound === roundName}
+              active={levelNumber === 2}
               locked={locked}
-              onClick={() => handleRoundChange(candidateRound)}
+              onClick={() => navigateToLevel(levelNumber as 1 | 2)}
             />
           );
         })}
@@ -4731,16 +4875,15 @@ export default function PackItScreen() {
                       visibility: isDesktopLayout ? "hidden" : "visible",
                     }}
                   >
-                    {ROUND_SEQUENCE.map((candidateRound, index) => {
-                      const levelNumber = index + 1;
-                      const locked = levelNumber > currentRoundLevel;
+                    {[1, 2, 3].map((levelNumber) => {
+                      const locked = levelNumber === 3;
                       return (
                         <MobileLevelButton
-                          key={candidateRound}
+                          key={`mobile-level-${levelNumber}`}
                           label={String(levelNumber)}
-                          active={candidateRound === roundName}
+                          active={levelNumber === 2}
                           locked={locked}
-                          onClick={() => handleRoundChange(candidateRound)}
+                          onClick={() => navigateToLevel(levelNumber as 1 | 2)}
                         />
                       );
                     })}
@@ -5361,7 +5504,7 @@ export default function PackItScreen() {
                           backgroundColor: "transparent",
                           backgroundImage: "none",
                           transition:
-                            "left 920ms ease-in-out, top 920ms ease-in-out",
+                            `left ${phantomDragState.durationMs ?? 220}ms ease-in-out, top ${phantomDragState.durationMs ?? 220}ms ease-in-out`,
                         }}
                       >
                         <span
@@ -5540,7 +5683,7 @@ export default function PackItScreen() {
       )}
       {isRoundComplete && (
         <div
-          className="absolute inset-0 z-[130] flex items-center justify-center p-6"
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-6"
           style={{
             background:
               "radial-gradient(ellipse at center, rgba(15,23,42,0.985) 0%, rgba(2,6,23,0.995) 78%)",
@@ -5652,3 +5795,33 @@ export default function PackItScreen() {
     </>
   );
 }
+
+// The old L1 drag mechanic (PackItLevelTwoScreen above) is preserved for
+// the upcoming L2 wiring. On this branch the game plays the new L1
+// tube-replicator mechanic implemented in PackItLevelOneScreen.
+export default function PackItScreen() {
+  const [level, setLevel] = useState<1 | 2>(readLevelFromUrl);
+
+  useEffect(() => {
+    const syncLevelFromEvent = (event: Event) => {
+      const nextLevel = (event as CustomEvent<{ level?: number }>).detail?.level;
+      if (nextLevel === 1 || nextLevel === 2) {
+        setLevel(nextLevel);
+      }
+    };
+
+    window.addEventListener(
+      LEVEL_CHANGE_EVENT,
+      syncLevelFromEvent as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        LEVEL_CHANGE_EVENT,
+        syncLevelFromEvent as EventListener,
+      );
+    };
+  }, []);
+
+  return level === 2 ? <PackItLevelTwoScreen /> : <PackItLevelOneScreen />;
+}
+void PackItLevelTwoScreen;

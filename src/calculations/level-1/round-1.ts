@@ -11,17 +11,18 @@ import type {
 type DynamicQuestionLocale = "en" | "hi" | "zh";
 
 const MOBILE_ROUND_PROFILE: RoundGenerationProfile = {
-  minTotalCount: 20,
-  maxTotalCount: 40,
-  maxGroupCount: 5,
-  maxUnitCount: 5,
+  // Level 1 constraints: unit 3–8, groups 3–8, total ≤ 64.
+  minTotalCount: 9,
+  maxTotalCount: 64,
+  maxGroupCount: 8,
+  maxUnitCount: 8,
 };
 
 const DESKTOP_ROUND_PROFILE: RoundGenerationProfile = {
-  minTotalCount: 20,
-  maxTotalCount: 80,
+  minTotalCount: 9,
+  maxTotalCount: 64,
   maxGroupCount: 8,
-  maxUnitCount: 10,
+  maxUnitCount: 8,
 };
 
 function getLevelOneRoundProfile(
@@ -36,161 +37,23 @@ function getLevelOneRoundProfile(
   };
 }
 
-function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-const LEVEL_ONE_LOAD_QUESTION_TEMPLATES = [
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `There are ${total} ${pair.itemPlural} that have to be packed equally into ${groups} ${pair.containerPlural}. How many shall each ${pair.container} have?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} are shared equally among ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} should go in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} need to be divided evenly into ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} will each ${pair.container} hold?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `A worker packs ${total} ${pair.itemPlural} into ${groups} ${pair.containerPlural} equally. How many ${pair.itemPlural} go into 1 ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${groups} ${pair.containerPlural} are used to package ${total} ${pair.itemPlural} equally. How many ${pair.itemPlural} belong in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} were packed into ${groups} ${pair.containerPlural} equally. How many ${pair.itemPlural} were placed in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `A shopkeeper arranged ${total} ${pair.itemPlural} evenly into ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} are in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} fill ${groups} ${pair.containerPlural} equally. How many ${pair.itemPlural} does 1 ${pair.container} hold?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `If ${total} ${pair.itemPlural} are split evenly across ${groups} ${pair.containerPlural}, how many ${pair.itemPlural} go into each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${groups} ${pair.containerPlural} each get the same number of ${pair.itemPlural}. If there are ${total} ${pair.itemPlural} altogether, how many go in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `A bakery needs to pack ${total} ${pair.itemPlural} evenly into ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} should be packed into each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `There are ${groups} ${pair.containerPlural} and ${total} ${pair.itemPlural} to share equally. How many ${pair.itemPlural} should each ${pair.container} get?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} are being distributed evenly into ${groups} ${pair.containerPlural}. What is the number of ${pair.itemPlural} in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `A total of ${total} ${pair.itemPlural} are sorted equally into ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} does each ${pair.container} contain?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} must be grouped equally into ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} are in each group?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `Workers placed ${total} ${pair.itemPlural} into ${groups} ${pair.containerPlural}, with each ${pair.container} holding the same amount. How many ${pair.itemPlural} are in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `All ${total} ${pair.itemPlural} are to be shared evenly between ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} will each ${pair.container} have?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${groups} ${pair.containerPlural} are filled equally with ${total} ${pair.itemPlural}. Find the number of ${pair.itemPlural} in each ${pair.container}.`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `Equal groups are made using ${total} ${pair.itemPlural} and ${groups} ${pair.containerPlural}. How many ${pair.itemPlural} are in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} are packed into ${groups} equal ${pair.containerPlural}. How many ${pair.itemPlural} are in one ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `There are ${groups} ${pair.containerPlural} to fill and ${total} ${pair.itemPlural} altogether. How many ${pair.itemPlural} go into each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${total} ${pair.itemPlural} are shared into ${groups} equal groups. Find how many ${pair.itemPlural} each ${pair.container} gets.`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `A total of ${total} ${pair.itemPlural} must be placed equally into ${groups} ${pair.containerPlural}. What is the number in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `${groups} ${pair.containerPlural} hold the same number of ${pair.itemPlural}. If there are ${total} ${pair.itemPlural}, how many are in each ${pair.container}?`,
-  (
-    pair: GroupingPair,
-    total: number,
-    groups: number,
-  ) =>
-    `When ${total} ${pair.itemPlural} are divided equally among ${groups} ${pair.containerPlural}, how many ${pair.itemPlural} does each ${pair.container} contain?`,
+const LEVEL_ONE_QUESTION_TEMPLATES = [
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `If 1 ${pair.container} holds ${unit} ${pair.itemPlural}, how many ${pair.itemPlural} would be in ${groups} ${pair.containerPlural}?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `One ${pair.container} holds ${unit} ${pair.itemPlural}. How many ${pair.itemPlural} are in ${groups} ${pair.containerPlural}?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `Each ${pair.container} holds ${unit} ${pair.itemPlural}. How many ${pair.itemPlural} fit in ${groups} ${pair.containerPlural}?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `A ${pair.container} is packed with ${unit} ${pair.itemPlural}. How many ${pair.itemPlural} are needed to fill ${groups} ${pair.containerPlural}?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `If a single ${pair.container} contains ${unit} ${pair.itemPlural}, how many ${pair.itemPlural} are there in ${groups} ${pair.containerPlural}?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `${unit} ${pair.itemPlural} fill 1 ${pair.container}. How many ${pair.itemPlural} fill ${groups} ${pair.containerPlural}?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `A ${pair.container} fits exactly ${unit} ${pair.itemPlural}. How many ${pair.itemPlural} will ${groups} ${pair.containerPlural} hold in total?`,
+  (pair: GroupingPair, unit: number, groups: number) =>
+    `${groups} ${pair.containerPlural} are each filled with ${unit} ${pair.itemPlural}. How many ${pair.itemPlural} are there altogether?`,
 ] as const;
 
 const LOCALIZED_PAIR_TEXT: Record<
@@ -235,7 +98,7 @@ function pickQuestionTemplateIndex(
   previousTemplateIndex: number | null,
   random: () => number,
 ) {
-  const templateCount = LEVEL_ONE_LOAD_QUESTION_TEMPLATES.length;
+  const templateCount = LEVEL_ONE_QUESTION_TEMPLATES.length;
 
   if (templateCount <= 1) {
     return 0;
@@ -255,16 +118,15 @@ function buildLevelOneBlackboardSteps(
   unit: number,
 ) {
   return [
-    `Total ${pair.itemPlural} = ${total}.`,
-    `Total ${pair.containerPlural} = ${groups}.`,
-    `∴ ${capitalize(pair.itemPlural)} per ${pair.container} = ${total} ÷ ${groups} = ${unit}.`,
+    `1 ${pair.container} = ${unit} ${pair.itemPlural}.`,
+    `${groups} ${pair.containerPlural} = ${groups} × ${unit} = ${total} ${pair.itemPlural}.`,
   ];
 }
 
 export function getLocalizedLevelOneQuestionText(
   question: Pick<
     PackQuestion,
-    "pair" | "questionTemplateIndex" | "totalA" | "groupsA"
+    "pair" | "questionTemplateIndex" | "unitRate" | "groupsA"
   >,
   locale: string,
 ) {
@@ -273,73 +135,36 @@ export function getLocalizedLevelOneQuestionText(
 
   if (normalizedLocale === "hi") {
     const templates = [
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर-बराबर रखना है। हर ${pairText.container} में कितने ${pairText.itemPlural} होंगे?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर बाँटा गया है। हर ${pairText.container} में कितने ${pairText.itemPlural} होंगे?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में समान रूप से बाँटना है। हर ${pairText.container} में कितने ${pairText.itemPlural} आएँगे?`,
-      `एक कामगार ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर भरता है। 1 ${pairText.container} में कितने ${pairText.itemPlural} जाएँगे?`,
-      `${question.groupsA} ${pairText.containerPlural} का उपयोग ${question.totalA} ${pairText.itemPlural} को बराबर पैक करने के लिए किया जाता है। हर ${pairText.container} में कितने ${pairText.itemPlural} होंगे?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर पैक किया गया। हर ${pairText.container} में कितने ${pairText.itemPlural} रखे गए?`,
-      `एक दुकानदार ने ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर सजाया। हर ${pairText.container} में कितने ${pairText.itemPlural} हैं?`,
-      `${question.totalA} ${pairText.itemPlural} से ${question.groupsA} ${pairText.containerPlural} बराबर भरते हैं। 1 ${pairText.container} में कितने ${pairText.itemPlural} हैं?`,
-      `यदि ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर बाँटा जाए, तो हर ${pairText.container} में कितने ${pairText.itemPlural} जाएँगे?`,
-      `${question.groupsA} ${pairText.containerPlural} में समान संख्या में ${pairText.itemPlural} हैं। यदि कुल ${question.totalA} ${pairText.itemPlural} हैं, तो हर ${pairText.container} में कितने जाएँगे?`,
-      `एक बेकरी को ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर पैक करना है। हर ${pairText.container} में कितने ${pairText.itemPlural} पैक होंगे?`,
-      `${question.groupsA} ${pairText.containerPlural} और ${question.totalA} ${pairText.itemPlural} हैं जिन्हें बराबर बाँटना है। हर ${pairText.container} को कितने ${pairText.itemPlural} मिलेंगे?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर बाँटा जा रहा है। हर ${pairText.container} में ${pairText.itemPlural} की संख्या क्या है?`,
-      `कुल ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में समान रूप से रखा गया है। हर ${pairText.container} में कितने ${pairText.itemPlural} हैं?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर समूहों में रखना है। हर समूह में कितने ${pairText.itemPlural} हैं?`,
-      `कामगारों ने ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में रखा, और हर ${pairText.container} में समान मात्रा है। हर ${pairText.container} में कितने ${pairText.itemPlural} हैं?`,
-      `सभी ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर बाँटना है। हर ${pairText.container} में कितने ${pairText.itemPlural} होंगे?`,
-      `${question.groupsA} ${pairText.containerPlural} को ${question.totalA} ${pairText.itemPlural} से बराबर भरा जाता है। हर ${pairText.container} में ${pairText.itemPlural} की संख्या ज्ञात कीजिए।`,
-      `${question.totalA} ${pairText.itemPlural} और ${question.groupsA} ${pairText.containerPlural} का उपयोग करके समान समूह बनाए जाते हैं। हर ${pairText.container} में कितने ${pairText.itemPlural} हैं?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} बराबर ${pairText.containerPlural} में पैक किया गया है। 1 ${pairText.container} में कितने ${pairText.itemPlural} हैं?`,
-      `${question.groupsA} ${pairText.containerPlural} भरने हैं और कुल ${question.totalA} ${pairText.itemPlural} हैं। हर ${pairText.container} में कितने ${pairText.itemPlural} जाएँगे?`,
-      `${question.totalA} ${pairText.itemPlural} को ${question.groupsA} बराबर समूहों में बाँटा गया है। हर ${pairText.container} को कितने ${pairText.itemPlural} मिलते हैं, ज्ञात कीजिए।`,
-      `कुल ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर रखना है। हर ${pairText.container} में कितने होंगे?`,
-      `${question.groupsA} ${pairText.containerPlural} में ${pairText.itemPlural} की संख्या समान है। यदि कुल ${question.totalA} ${pairText.itemPlural} हैं, तो हर ${pairText.container} में कितने हैं?`,
-      `जब ${question.totalA} ${pairText.itemPlural} को ${question.groupsA} ${pairText.containerPlural} में बराबर बाँटा जाता है, तब हर ${pairText.container} में कितने ${pairText.itemPlural} होते हैं?`,
+      `यदि 1 ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं, तो ${question.groupsA} ${pairText.containerPlural} में कितने ${pairText.itemPlural} होंगे?`,
+      `एक ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं। ${question.groupsA} ${pairText.containerPlural} में कितने ${pairText.itemPlural} होंगे?`,
+      `हर ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं। ${question.groupsA} ${pairText.containerPlural} में कुल कितने ${pairText.itemPlural} होंगे?`,
+      `एक ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} भरे हैं। ${question.groupsA} ${pairText.containerPlural} भरने के लिए कितने ${pairText.itemPlural} चाहिए?`,
+      `यदि एक ${pairText.container} में ${question.unitRate} ${pairText.itemPlural} हैं, तो ${question.groupsA} ${pairText.containerPlural} में कुल कितने ${pairText.itemPlural} होंगे?`,
+      `${question.unitRate} ${pairText.itemPlural} 1 ${pairText.container} भरते हैं। ${question.groupsA} ${pairText.containerPlural} भरने के लिए कितने ${pairText.itemPlural} चाहिए?`,
+      `एक ${pairText.container} में ठीक ${question.unitRate} ${pairText.itemPlural} आते हैं। ${question.groupsA} ${pairText.containerPlural} में कुल कितने ${pairText.itemPlural} होंगे?`,
+      `${question.groupsA} ${pairText.containerPlural} में हर एक में ${question.unitRate} ${pairText.itemPlural} हैं। कुल कितने ${pairText.itemPlural} हैं?`,
     ];
-
-    return templates[question.questionTemplateIndex];
+    return templates[question.questionTemplateIndex] ?? templates[0];
   }
 
   if (normalizedLocale === "zh") {
     const templates = [
-      `${question.totalA}${pairText.itemPlural}要平均放入${question.groupsA}${pairText.containerPlural}中。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}平均分到${question.groupsA}${pairText.containerPlural}中。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}需要平均分进${question.groupsA}${pairText.containerPlural}。每个${pairText.container}能装多少${pairText.itemPlural}？`,
-      `一位工人把${question.totalA}${pairText.itemPlural}平均装入${question.groupsA}${pairText.containerPlural}。1个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.groupsA}${pairText.containerPlural}用来平均装${question.totalA}${pairText.itemPlural}。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}被平均装进${question.groupsA}${pairText.containerPlural}。每个${pairText.container}里放了多少${pairText.itemPlural}？`,
-      `店主把${question.totalA}${pairText.itemPlural}平均摆进${question.groupsA}${pairText.containerPlural}。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}平均装满${question.groupsA}${pairText.containerPlural}。1个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `如果把${question.totalA}${pairText.itemPlural}平均分到${question.groupsA}${pairText.containerPlural}中，每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.groupsA}${pairText.containerPlural}里都有相同数量的${pairText.itemPlural}。如果一共有${question.totalA}${pairText.itemPlural}，每个${pairText.container}里有多少？`,
-      `一家烘焙店需要把${question.totalA}${pairText.itemPlural}平均装进${question.groupsA}${pairText.containerPlural}。每个${pairText.container}要装多少${pairText.itemPlural}？`,
-      `有${question.groupsA}${pairText.containerPlural}和${question.totalA}${pairText.itemPlural}需要平均分。每个${pairText.container}应分到多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}正在平均分进${question.groupsA}${pairText.containerPlural}。每个${pairText.container}中的${pairText.itemPlural}数量是多少？`,
-      `总共${question.totalA}${pairText.itemPlural}被平均放入${question.groupsA}${pairText.containerPlural}。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}必须平均分成${question.groupsA}${pairText.containerPlural}。每组有多少${pairText.itemPlural}？`,
-      `工人们把${question.totalA}${pairText.itemPlural}放进${question.groupsA}${pairText.containerPlural}，每个${pairText.container}里的数量都相同。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `全部${question.totalA}${pairText.itemPlural}要平均分到${question.groupsA}${pairText.containerPlural}里。每个${pairText.container}里会有多少${pairText.itemPlural}？`,
-      `${question.groupsA}${pairText.containerPlural}都被${question.totalA}${pairText.itemPlural}平均装满。求每个${pairText.container}中的${pairText.itemPlural}数量。`,
-      `用${question.totalA}${pairText.itemPlural}和${question.groupsA}${pairText.containerPlural}组成相等的组。每个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}被装入${question.groupsA}个相等的${pairText.containerPlural}中。1个${pairText.container}里有多少${pairText.itemPlural}？`,
-      `有${question.groupsA}${pairText.containerPlural}要装满，一共有${question.totalA}${pairText.itemPlural}。每个${pairText.container}里要放多少${pairText.itemPlural}？`,
-      `${question.totalA}${pairText.itemPlural}被分成${question.groupsA}个相等的组。求每个${pairText.container}分到多少${pairText.itemPlural}。`,
-      `总共${question.totalA}${pairText.itemPlural}必须平均放入${question.groupsA}${pairText.containerPlural}。每个${pairText.container}里有多少？`,
-      `${question.groupsA}${pairText.containerPlural}里装着相同数量的${pairText.itemPlural}。如果总共有${question.totalA}${pairText.itemPlural}，那么每个${pairText.container}里有多少？`,
-      `当${question.totalA}${pairText.itemPlural}平均分给${question.groupsA}${pairText.containerPlural}时，每个${pairText.container}里有多少${pairText.itemPlural}？`,
+      `如果1个${pairText.container}里有${question.unitRate}${pairText.itemPlural}，那么${question.groupsA}${pairText.containerPlural}里一共有多少${pairText.itemPlural}？`,
+      `一个${pairText.container}里有${question.unitRate}${pairText.itemPlural}。${question.groupsA}${pairText.containerPlural}里有多少${pairText.itemPlural}？`,
+      `每个${pairText.container}里有${question.unitRate}${pairText.itemPlural}。${question.groupsA}${pairText.containerPlural}里总共有多少${pairText.itemPlural}？`,
+      `一个${pairText.container}装有${question.unitRate}${pairText.itemPlural}。装满${question.groupsA}${pairText.containerPlural}需要多少${pairText.itemPlural}？`,
+      `如果一个${pairText.container}里有${question.unitRate}${pairText.itemPlural}，那么${question.groupsA}${pairText.containerPlural}里一共有多少${pairText.itemPlural}？`,
+      `${question.unitRate}${pairText.itemPlural}装满1个${pairText.container}。装满${question.groupsA}${pairText.containerPlural}需要多少${pairText.itemPlural}？`,
+      `一个${pairText.container}正好能装${question.unitRate}${pairText.itemPlural}。${question.groupsA}${pairText.containerPlural}一共能装多少${pairText.itemPlural}？`,
+      `${question.groupsA}${pairText.containerPlural}里每个都装有${question.unitRate}${pairText.itemPlural}。总共有多少${pairText.itemPlural}？`,
     ];
-
-    return templates[question.questionTemplateIndex];
+    return templates[question.questionTemplateIndex] ?? templates[0];
   }
 
-  return LEVEL_ONE_LOAD_QUESTION_TEMPLATES[question.questionTemplateIndex](
-    question.pair,
-    question.totalA,
-    question.groupsA,
-  );
+  const template =
+    LEVEL_ONE_QUESTION_TEMPLATES[question.questionTemplateIndex] ??
+    LEVEL_ONE_QUESTION_TEMPLATES[0];
+  return template(question.pair, question.unitRate, question.groupsA);
 }
 
 export function getLocalizedLevelOneBlackboardSteps(
@@ -351,17 +176,15 @@ export function getLocalizedLevelOneBlackboardSteps(
 
   if (normalizedLocale === "hi") {
     return [
-      `कुल ${pairText.itemPlural} = ${question.totalA}.`,
-      `कुल ${pairText.containerPlural} = ${question.groupsA}.`,
-      `∴ प्रति ${pairText.container} ${pairText.itemPlural} = ${question.totalA} ÷ ${question.groupsA} = ${question.unitRate}.`,
+      `1 ${pairText.container} = ${question.unitRate} ${pairText.itemPlural}.`,
+      `${question.groupsA} ${pairText.containerPlural} = ${question.groupsA} × ${question.unitRate} = ${question.totalA} ${pairText.itemPlural}.`,
     ];
   }
 
   if (normalizedLocale === "zh") {
     return [
-      `${pairText.itemPlural}总数 = ${question.totalA}。`,
-      `${pairText.containerPlural}总数 = ${question.groupsA}。`,
-      `∴ 每个${pairText.container}中的${pairText.itemPlural} = ${question.totalA} ÷ ${question.groupsA} = ${question.unitRate}。`,
+      `1个${pairText.container} = ${question.unitRate}${pairText.itemPlural}。`,
+      `${question.groupsA}${pairText.containerPlural} = ${question.groupsA} × ${question.unitRate} = ${question.totalA}${pairText.itemPlural}。`,
     ];
   }
 
@@ -373,24 +196,6 @@ export function getLocalizedLevelOneBlackboardSteps(
   );
 }
 
-export function getLocalizedInsufficientItemsLabel(
-  pair: GroupingPair,
-  locale: string,
-) {
-  const normalizedLocale = (locale === "hi" || locale === "zh" ? locale : "en") as DynamicQuestionLocale;
-  const pairText = getPairText(pair, normalizedLocale);
-
-  if (normalizedLocale === "hi") {
-    return `पर्याप्त ${pairText.itemPlural} नहीं हैं`;
-  }
-
-  if (normalizedLocale === "zh") {
-    return `${pairText.itemPlural}不足`;
-  }
-
-  return `Insufficient ${pair.itemPlural}`;
-}
-
 export function createLevelOneQuestion(
   round: RoundName,
   profile: RoundGenerationProfile,
@@ -398,41 +203,33 @@ export function createLevelOneQuestion(
   random: () => number = Math.random,
   previousTemplateIndex: number | null = null,
 ): PackQuestion {
-  const pair = pickPair(usedPairs, random);
-  const minGroups = Math.max(
-    2,
-    Math.ceil(profile.minTotalCount / profile.maxUnitCount),
-  );
-  const groups = randInt(minGroups, profile.maxGroupCount, random);
-  const minUnit = round === "load" ? 2 : 3;
-  const minUnitFromTotal = Math.max(minUnit, Math.ceil(profile.minTotalCount / groups));
-  const maxUnit = Math.max(
-    minUnitFromTotal,
-    Math.min(
-      profile.maxUnitCount,
-      Math.floor(profile.maxTotalCount / groups),
-    ),
-  );
-  const unit = randInt(minUnitFromTotal, maxUnit, random);
+  const minUnit = Math.max(3, 3);
+  const maxUnit = Math.min(profile.maxUnitCount, 8);
+  const minGroups = Math.max(3, 3);
+  const maxGroups = Math.min(profile.maxGroupCount, 8);
+
+  const unit = randInt(minUnit, Math.max(minUnit, maxUnit), random);
+  const groups = randInt(minGroups, Math.max(minGroups, maxGroups), random);
   const total = groups * unit;
+  const pair = pickPair(usedPairs, random);
   const templateIndex = pickQuestionTemplateIndex(previousTemplateIndex, random);
-  const questionText = LEVEL_ONE_LOAD_QUESTION_TEMPLATES[templateIndex](
+  const questionText = LEVEL_ONE_QUESTION_TEMPLATES[templateIndex](
     pair,
-    total,
+    unit,
     groups,
   );
 
   return {
     level: 1,
     round,
-    subtype: "find-unit",
+    subtype: "find-total",
     questionTemplateIndex: templateIndex,
     pair,
     totalA: total,
     groupsA: groups,
     unitRate: unit,
-    answer: unit,
-    answerUnit: `${pair.itemPlural} per ${pair.container}`,
+    answer: total,
+    answerUnit: pair.itemPlural,
     questionText,
     blackboardSteps: buildLevelOneBlackboardSteps(pair, total, groups, unit),
     isFraction: false,
@@ -455,11 +252,7 @@ function createLevelOneRound(
       previousTemplateIndex,
     );
     usedPairs.push(question.pair);
-    previousTemplateIndex = LEVEL_ONE_LOAD_QUESTION_TEMPLATES.findIndex(
-      (template) =>
-        template(question.pair, question.totalA, question.groupsA) ===
-        question.questionText,
-    );
+    previousTemplateIndex = question.questionTemplateIndex;
     return question;
   });
 

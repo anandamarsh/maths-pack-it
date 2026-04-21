@@ -12,8 +12,9 @@ playing → levelComplete → playing (next level) → ... → gameComplete
 
 ```
 waitingForInput
-  → (L1 Load) dragging / tapping items
-  → (L2–L4) keypadEntry
+  → (L1 all rounds) tube replicate / delete
+  → (L2 Load/Pack) dragging / tapping items
+  → (L1 Pack/Ship, L2 Ship, L3–L4) keypadEntry
   → submitting
   → feedbackCorrect   → nextQuestion (or levelComplete)
   → feedbackWrong     → waitingForInput (same question, pointsDeductedThisQuestion = true)
@@ -24,12 +25,12 @@ waitingForInput
 
 | Level | Round | Phase sequence | Keypad? |
 |-------|-------|---------------|---------|
-| L1 | Load | drag/tap → auto-answer → feedbackCorrect | Hidden |
-| L1 | Pack | drag/tap → keypadEntry → submit → feedback | Visible |
-| L1 | Ship | keypadEntry → submit → drag/tap animation confirms | Visible |
-| L2 | Load | keypadEntry → submit → animation plays | Visible |
-| L2 | Pack | keypadEntry → submit → animation plays | Visible |
-| L2 | Ship | keypadEntry → submit → minimal animation | Visible |
+| L1 | Load | replicate tubes (+)/remove (−) → auto-correct when target reached → feedbackCorrect | Visible (passive) |
+| L1 | Pack | replicate tubes → keypadEntry → submit → feedback | Visible |
+| L1 | Ship | keypadEntry → submit → tubes animate to confirm | Visible |
+| L2 | Load | drag combo → auto-correct on full pack → feedbackCorrect | Hidden |
+| L2 | Pack | drag/tap → keypadEntry → submit → feedback | Visible |
+| L2 | Ship | keypadEntry → submit → drag/tap animation confirms | Visible |
 | L3 | Load | keypadEntry step 1 (unit) → auto-shows → keypadEntry step 2 → animation | Visible |
 | L3 | Pack | keypadEntry → submit → animation | Visible |
 | L3 | Ship | keypadEntry → submit → brief confirmation only | Visible |
@@ -135,16 +136,37 @@ function advanceQuestion() {
   }
 }
 
-// L1 Load: item dropped into container
+// L1 (all rounds): test-tube replicate / delete.
+// Internal state: tubeCount (starts at 1 — the static pre-filled tube).
+// Derived: currentTotal = tubeCount × q.unitRate.
+function handleL1Replicate() {
+  setTubeCount(n => n + 1);
+  // Round Load: if currentTotal === q.totalA (target), auto-correct
+  if (round === 'load' && (tubeCount + 1) === q.groupsA) {
+    appendBlackboardLine(`1 ${q.pair.container} = ${q.unitRate} ${q.pair.itemPlural}.`);
+    appendBlackboardLine(`${q.groupsA} ${q.pair.containerPlural} = ${q.groupsA} × ${q.unitRate} = ${q.totalA} ${q.pair.itemPlural}.`);
+    handleCorrect();
+  }
+}
+function handleL1DeleteTube(tubeId: string) {
+  setTubeCount(n => Math.max(1, n - 1)); // first tube is static, cannot delete
+}
+
+// L1 progress-bar state machine
+// fillFraction = tubeCount / q.groupsA
+// colour:
+//   fillFraction < 1  → blue
+//   fillFraction === 1 → green + flashing (done cue)
+//   fillFraction > 1  → red + flashing/beeping (too far)
+
+// L2 Load: item dropped into container (former L1 Load mechanic)
 function handleItemDrop(itemId: string, containerId: string) {
-  // Update itemPositions
-  // When container reaches target count → trigger auto-correct
   const q = questions[questionIndex];
   if (containerFillCount(containerId) === q.unitRate) {
     appendBlackboardLine(`1 ${q.pair.container} → ${q.unitRate} ${q.pair.itemPlural}`);
     if (allContainersFull()) {
       appendBlackboardLine(`${q.groupsA} ${q.pair.containerPlural} → ${q.totalA} ${q.pair.itemPlural}`);
-      handleCorrect(); // L1 Load is auto-correct on completion
+      handleCorrect(); // L2 Load is auto-correct on completion
     }
   }
 }
